@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#6C63FF">
+  <meta name="description" content="11+ GL Assessment Practice App">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>11+ Practice</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="assets/icons/icon-192.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.svg">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Home View -->
+    <div id="view-home" class="view"></div>
+
+    <!-- Subject View (level grid) -->
+    <div id="view-subject" class="view hidden"></div>
+
+    <!-- Intro View (topic introduction) -->
+    <div id="view-intro" class="view hidden"></div>
+
+    <!-- Question View -->
+    <div id="view-question" class="view hidden"></div>
+
+    <!-- Results View -->
+    <div id="view-results" class="view hidden"></div>
+
+    <!-- Dashboard View -->
+    <div id="view-dashboard" class="view hidden"></div>
+
+    <!-- DEV View -->
+    <div id="view-dev" class="view hidden"></div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

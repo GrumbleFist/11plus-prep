@@ -1,0 +1,16 @@
+# Local screenshots / scratch
+NVR*.png
+*.local.png
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Node (if ever added)
+node_modules/
