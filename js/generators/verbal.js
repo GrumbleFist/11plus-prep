@@ -448,10 +448,10 @@ function numberSequenceQuestion(level, index, rng) {
     case 'alternating': {
       const a = randInt(rng, 1, 10);
       const b = randInt(rng, 2, 5);
-      const c = randInt(rng, 1, 4);
+      const c = randInt(rng, 1, Math.min(b - 1, 4));
       for (let i = 0; i < 5; i++) terms.push(a + i * b + (i % 2 === 0 ? 0 : c));
       answer = a + 5 * b + (5 % 2 === 0 ? 0 : c);
-      rule = `Alternating pattern: add ${b}, add ${b + c}, add ${b}, add ${b + c}...`;
+      rule = `Alternating pattern: +${b + c}, +${b - c}, +${b + c}, +${b - c}...`;
       break;
     }
     case 'squares': {
