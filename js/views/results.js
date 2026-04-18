@@ -7,13 +7,15 @@ import { getProgress, saveProgress } from '../storage.js';
 let lastResults = null;
 let lastSubject = null;
 let lastLevel = null;
+let lastBranchId = null;
 
 export function init() {}
 
-export function showResults(results, subject, level) {
+export function showResults(results, subject, level, branchId = null) {
   lastResults = results;
   lastSubject = subject;
   lastLevel = level;
+  lastBranchId = branchId;
   navigate('#/results');
 }
 
@@ -34,17 +36,32 @@ export async function show() {
   const withinTime = lastResults.filter(r => r.withinTime).length;
   const passed = correct >= Math.ceil(total * 0.6); // 60% to pass
 
-  // Update progress if passed
+  // Update progress if passed. Track per-branch progress when branchId is present,
+  // otherwise keep writing to the legacy flat structure for backwards compatibility.
   if (passed && lastLevel) {
     try {
       const progress = await getProgress(lastSubject) || { subject: lastSubject, currentLevel: 1, completedLevels: [] };
-      if (!progress.completedLevels.includes(lastLevel)) {
-        progress.completedLevels.push(lastLevel);
-      }
-      if (lastLevel >= progress.currentLevel) {
-        progress.currentLevel = Math.min(lastLevel + 1, 100);
-      }
       progress.subject = lastSubject;
+
+      if (lastBranchId) {
+        progress.branches = progress.branches || {};
+        const bp = progress.branches[lastBranchId] || { currentLevel: 1, completedLevels: [] };
+        if (!bp.completedLevels.includes(lastLevel)) {
+          bp.completedLevels.push(lastLevel);
+        }
+        if (lastLevel >= bp.currentLevel) {
+          bp.currentLevel = lastLevel + 1;
+        }
+        progress.branches[lastBranchId] = bp;
+      } else {
+        if (!progress.completedLevels.includes(lastLevel)) {
+          progress.completedLevels.push(lastLevel);
+        }
+        if (lastLevel >= progress.currentLevel) {
+          progress.currentLevel = Math.min(lastLevel + 1, 100);
+        }
+      }
+
       await saveProgress(progress);
     } catch (err) {
       console.error('Failed to save progress:', err);
@@ -113,12 +130,16 @@ export async function show() {
   const actions = document.createElement('div');
   actions.className = 'results-actions';
 
+  const introPath = (lv) => lastBranchId
+    ? `#/intro/${lastSubject}/${lastBranchId}/${lv}`
+    : `#/intro/${lastSubject}/${lv}`;
+
   if (passed && lastLevel && lastLevel < 100) {
     const nextBtn = document.createElement('button');
     nextBtn.className = 'btn-next';
     nextBtn.textContent = `Next Level (${lastLevel + 1})`;
     nextBtn.addEventListener('click', () => {
-      navigate(`#/intro/${lastSubject}/${lastLevel + 1}`);
+      navigate(introPath(lastLevel + 1));
     });
     actions.appendChild(nextBtn);
   } else if (!passed) {
@@ -126,7 +147,7 @@ export async function show() {
     retryBtn.className = 'btn-next';
     retryBtn.textContent = 'Try Again';
     retryBtn.addEventListener('click', () => {
-      navigate(`#/intro/${lastSubject}/${lastLevel}`);
+      navigate(introPath(lastLevel));
     });
     actions.appendChild(retryBtn);
   }

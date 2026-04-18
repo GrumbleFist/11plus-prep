@@ -1,16 +1,15 @@
-// Subject view — 10×10 level grid with locked/unlocked/completed states
+// Subject view — renders the Phase 9 skill tree.
+// Each branch becomes a section with its own strip of level buttons.
+// Click a level -> #/intro/:subject/:branchId/:level
 
 import { SUBJECT_META, createBackButton } from '../ui.js';
 import { navigate } from '../router.js';
 import { getProgress } from '../storage.js';
-import { getTopicForLevel } from '../generators/difficulty.js';
-
-let currentSubject = null;
+import { getTree } from '../data/loader.js';
 
 export function init() {}
 
 export async function show(subject) {
-  currentSubject = subject;
   const view = document.getElementById('view-subject');
   const meta = SUBJECT_META[subject];
 
@@ -19,9 +18,19 @@ export async function show(subject) {
     return;
   }
 
-  const progress = await getProgress(subject) || { currentLevel: 1, completedLevels: [] };
-  const completed = new Set(progress.completedLevels || []);
-  const currentLevel = progress.currentLevel || 1;
+  view.innerHTML = '<p style="text-align:center;padding:40px;color:var(--text-light)">Loading tree…</p>';
+
+  let tree;
+  try {
+    tree = await getTree(subject);
+  } catch (err) {
+    console.error('Failed to load tree:', err);
+    view.innerHTML = `<p style="padding:20px;color:#c00">Could not load ${meta.name} tree. Check console.</p>`;
+    return;
+  }
+
+  const progress = (await getProgress(subject)) || {};
+  const branchProgress = progress.branches || {};
 
   view.innerHTML = '';
 
@@ -30,70 +39,87 @@ export async function show(subject) {
   header.className = 'subject-header';
   header.appendChild(createBackButton('Home', '#/'));
 
+  const totalLevels = tree.totalLevels || tree.branches.reduce((a, b) => a + (b.levelCount || 0), 0);
+  const completedCount = Object.values(branchProgress)
+    .reduce((a, bp) => a + ((bp.completedLevels && bp.completedLevels.length) || 0), 0);
+
   const titleArea = document.createElement('div');
   titleArea.innerHTML = `
     <h2>${meta.icon} ${meta.name}</h2>
-    <p class="subject-progress-text">${completed.size} of 100 levels completed</p>
+    <p class="subject-progress-text">${completedCount} of ${totalLevels} levels completed across ${tree.branches.length} branches</p>
   `;
   header.appendChild(titleArea);
   view.appendChild(header);
 
-  // Progress summary bar
+  // Overall progress bar
   const summaryBar = document.createElement('div');
   summaryBar.className = 'subject-summary-bar';
+  const pct = totalLevels > 0 ? (completedCount / totalLevels) * 100 : 0;
   summaryBar.innerHTML = `
     <div class="progress-bar-container" style="margin-bottom:0">
-      <div class="progress-bar-fill fill-${meta.color}" style="width: ${completed.size}%"></div>
+      <div class="progress-bar-fill fill-${meta.color}" style="width:${pct}%"></div>
     </div>
   `;
   view.appendChild(summaryBar);
 
-  // Level grid (10 rows × 10 columns)
-  const grid = document.createElement('div');
-  grid.className = 'level-grid';
+  // Branches
+  const branchList = document.createElement('div');
+  branchList.className = 'branch-list';
 
-  for (let level = 1; level <= 100; level++) {
-    const btn = document.createElement('button');
-    btn.className = 'level-btn';
-    btn.textContent = level;
+  for (const branch of tree.branches) {
+    const bp = branchProgress[branch.id] || { currentLevel: 1, completedLevels: [] };
+    const completedSet = new Set(bp.completedLevels || []);
+    const currentLevel = bp.currentLevel || 1;
 
-    const isCompleted = completed.has(level);
-    const isUnlocked = true; // All levels unlocked for testing
-    const isCurrent = level === currentLevel;
+    const section = document.createElement('section');
+    section.className = 'branch-section';
 
-    if (isCompleted) {
-      btn.classList.add('level-completed');
-      btn.classList.add(`level-completed-${meta.color}`);
-    } else if (isCurrent) {
-      btn.classList.add('level-current');
-      btn.classList.add(`level-current-${meta.color}`);
-    } else if (isUnlocked) {
-      btn.classList.add('level-unlocked');
-    } else {
-      btn.classList.add('level-locked');
-    }
+    const brHeader = document.createElement('header');
+    brHeader.className = 'branch-header';
+    brHeader.innerHTML = `
+      <div class="branch-title-row">
+        <h3 class="branch-title">${branch.displayName}</h3>
+        ${branch.childFriendlyName ? `<span class="branch-friendly">${branch.childFriendlyName}</span>` : ''}
+      </div>
+      <p class="branch-desc">${branch.description || ''}</p>
+      <p class="branch-progress-text">${completedSet.size} / ${branch.levelCount} levels</p>
+    `;
+    section.appendChild(brHeader);
 
-    if (isUnlocked) {
+    const strip = document.createElement('div');
+    strip.className = 'branch-strip';
+
+    for (let lv = 1; lv <= branch.levelCount; lv++) {
+      const btn = document.createElement('button');
+      btn.className = 'level-btn';
+      btn.textContent = lv;
+
+      const levelDef = (branch.levels || []).find(l => l.level === lv);
+      if (levelDef && levelDef.note === '5/5 gate') {
+        btn.classList.add('level-gate');
+        btn.title = 'Mastery gate: 5/5 required';
+      }
+
+      if (completedSet.has(lv)) {
+        btn.classList.add('level-completed', `level-completed-${meta.color}`);
+      } else if (lv === currentLevel) {
+        btn.classList.add('level-current', `level-current-${meta.color}`);
+      } else {
+        btn.classList.add('level-unlocked');
+      }
+
       btn.addEventListener('click', () => {
-        navigate(`#/intro/${subject}/${level}`);
+        navigate(`#/intro/${subject}/${branch.id}/${lv}`);
       });
+
+      strip.appendChild(btn);
     }
 
-    grid.appendChild(btn);
+    section.appendChild(strip);
+    branchList.appendChild(section);
   }
 
-  view.appendChild(grid);
-
-  // Legend
-  const legend = document.createElement('div');
-  legend.className = 'level-legend';
-  legend.innerHTML = `
-    <span class="legend-item"><span class="legend-dot level-completed level-completed-${meta.color}"></span> Completed</span>
-    <span class="legend-item"><span class="legend-dot level-current level-current-${meta.color}"></span> Current</span>
-    <span class="legend-item"><span class="legend-dot level-unlocked"></span> Unlocked</span>
-    <span class="legend-item"><span class="legend-dot level-locked"></span> Locked</span>
-  `;
-  view.appendChild(legend);
+  view.appendChild(branchList);
 }
 
 export function hide() {}

@@ -1,4 +1,4 @@
-const CACHE_NAME = '11plus-v17';
+const CACHE_NAME = '11plus-v18';
 const ASSETS = [
   './',
   './index.html',
@@ -22,6 +22,13 @@ const ASSETS = [
   './js/generators/verbal.js',
   './js/generators/nonverbal.js',
   './js/data/intro-content.js',
+  './js/data/loader.js',
+  './js/data/bankAdapter.js',
+  './js/data/trees/english.json',
+  './js/data/trees/maths.json',
+  './js/data/trees/verbal.json',
+  './js/data/trees/nonverbal.json',
+  './js/data/banks/english/spelling.json',
   './manifest.json'
 ];
 
