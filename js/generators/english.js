@@ -428,6 +428,7 @@ function spellingQuestion(level, index, rng) {
   return {
     prompt: 'Which is the correct spelling?',
     options, correctIndex: options.indexOf(entry.correct),
+    pronounceWord: entry.correct,
     explanation: { steps: [`The correct spelling is "${entry.correct}".`], tip: 'Look carefully at doubled letters, vowel order and silent letters.' }
   };
 }
@@ -438,6 +439,7 @@ function synonymQuestion(level, index, rng) {
   return {
     prompt: `Which word is closest in meaning to "${entry.word}"?`,
     options, correctIndex: options.indexOf(entry.syn),
+    pronounceWord: entry.word,
     explanation: { steps: [`"${entry.word}" means the same as "${entry.syn}".`], tip: 'A synonym is a word with the same or similar meaning.' }
   };
 }
@@ -448,6 +450,7 @@ function antonymQuestion(level, index, rng) {
   return {
     prompt: `Which word is most opposite in meaning to "${entry.word}"?`,
     options, correctIndex: options.indexOf(entry.answer),
+    pronounceWord: entry.word,
     explanation: { steps: [`The opposite of "${entry.word}" is "${entry.answer}".`], tip: 'An antonym is a word with the opposite meaning.' }
   };
 }
@@ -538,6 +541,7 @@ export function generateEnglishQuestions(level, count = 5) {
       promptHtml: q.promptHtml || undefined,
       options: q.options,
       correctIndex: q.correctIndex,
+      pronounceWord: q.pronounceWord || undefined,
       timeAllowedSeconds: params.timeAllowedSeconds || 60,
       explanation: q.explanation
     });

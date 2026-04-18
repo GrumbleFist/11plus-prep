@@ -1,10 +1,10 @@
 # PROJECT_STATUS
 
 ## Last Updated
-2026-04-16 — Deployed to GitHub Pages. Major verbal/NVR quality pass: hidden-words bank rewritten with natural sentences + runtime validator, anagrams/letter-sets/connecting-words banks cleaned, balance-equation ambiguity fixed, create-a-word letter order shuffled, NVR reflection + analogies rewritten. Cache v15.
+2026-04-18 — Context reset recovered. Research phase complete (docs 07-10 landed). No commits yet since overnight run; all work is in working copy. Awaiting user direction on commit-first vs plough-on.
 
 ## Project Purpose
-PWA for 11+ GL Assessment exam preparation, hosted on GitHub Pages, installable on Android tablet. For a 10-year-old targeting superselective grammar school entry (September 2027). Four subjects, 100 levels each, 5 questions per level, child-friendly explanations, parent dashboard.
+PWA for 11+ GL Assessment exam preparation. Initially built as a single-user tool for user's son (exam Sep 2027, superselective target). Path A locked: polish PWA to SaaS-grade first, commercialise later. GL Assessment only, four subjects only (English, Maths, VR, NVR).
 
 ## Deployment
 - **GitHub repo:** https://github.com/GrumbleFist/11plus-prep (public, main branch)
@@ -12,73 +12,78 @@ PWA for 11+ GL Assessment exam preparation, hosted on GitHub Pages, installable 
 - Pages auto-deploys on push to `main`.
 - Local dev: `python -m http.server 8080` from project root.
 
-## Current State
-- **Phases 1-7 COMPLETE**
-- **Phase 8 (Polish + PWA Hardening)** — mostly done (still: audit remaining question types, re-enable level locking)
-- **Level locking DISABLED** for testing — all 100 levels unlocked in every subject
-- **Service worker cache v15**
+## Current Phase
+**Phase 9 — Content rebuild + skill tree architecture + quality pipeline.**
+Research streams 07-10 have all landed. Next: scaffold validators, synthesise research doc 10 (1,136 lines) into concrete tree JSONs, begin bank generation.
 
-## Recent Changes (today's session)
-1. **NVR reflection** rewritten — no mirror line in options; prompt shows original figure only with clear "vertical/horizontal mirror" wording.
-2. **NVR analogies** ruleType 2 replaced — dropped the "sides + 1" rule (unfair from a single A→B example); now uses a two-property change (colour + solid→empty) that is inferable from one pair.
-3. **Verbal ANAGRAMS bank** rewritten — every entry uses a word with no common English anagram, every distractor uses at least one letter not in the jumbled set. Fixed OLFR→FLOOR letter-count bug and DROG→GROD (not a word). Runtime guard filters entries where jumbled letters don't match answer.
-4. **Verbal LETTER_SETS bank** rewritten — same discipline. Removed SNAP/SPAN, DRAW/WARD, BLOW/BOWL, NEST/NETS, RING/GRIN, SLIP/LIPS, CHIN/INCH anagram-twin false wrongs.
-5. **Verbal CONNECTING_WORDS bank** rewritten — removed nonsense compounds (cupcup, bookbook, waterwater, eyeeye, backback, sunsun, lookline, bagcase, guardkeeper). Added ~20 verified pairs.
-6. **Verbal balance-equations** multiplication type fixed — previously had ambiguous "▲×●=P, ▲+●=S" with unenforced ordering; now uses "▲×●=P, ●−▲=D" which has a unique positive solution.
-7. **Verbal create-a-word** — letters now shuffled with the per-question rng before display (previously spelled the answer left-to-right).
-8. **Verbal HIDDEN_WORD_PUZZLES** rewritten — natural grammatical sentences only; runtime validator confirms answer is actually a substring of the sentence. Removed PENALTY (not actually in its sentence), WALRUS (ungrammatical "wal rust"), FITNESS/WITNESS mismatch, and all "cup board", "ham mocked", "pan trying" style stilted splits.
-9. **Repo published.** New `.gitignore` + `README.md`. Initial commit pushed. Pages enabled via GitHub API.
+## Uncommitted Working-Copy State (git status)
+Modified:
+- `PROJECT_STATUS.md`, `js/generators/english.js`, `js/views/question.js`, `sw.js`
 
-## Build Phases
-1. ~~Skeleton + DEV~~ DONE
-2. ~~Level Structure + Timer + Intros~~ DONE
-3. ~~Maths Generator~~ DONE
-4. ~~Verbal Reasoning Generator~~ DONE
-5. ~~NVR SVG Generator~~ DONE (ongoing quality fixes)
-6. ~~English Question Bank~~ DONE
-7. ~~Parent Dashboard + Export~~ DONE
-8. **Polish + PWA Hardening** — IN PROGRESS
+Untracked (new):
+- `COMPETITOR_TEARDOWN.md`, `CURRENT_STATE.md`, `PHASE9_ARCHITECTURE.md`, `PRODUCT_VISION_DRAFT.md`, `RESEARCH_PLAN.md`
+- `research/07-gl-landscape-2026.md` (262 lines)
+- `research/08-pedagogy-and-progression.md` (392 lines)
+- `research/09-item-design-and-variety.md` (402 lines)
+- `research/10-skill-tree-blueprints.md` (1,136 lines)
 
-## Next Steps
-1. Audit remaining verbal types (letter-codes, word-number-codes, calculating-with-letters, letter-sequences, word-analogies, missing-three-letter-word) for ambiguity / invalid-distractor bugs.
-2. Audit remaining NVR types (series, classification, matrices, coding, paper folding).
-3. Re-enable level progression with a sensible pass threshold.
-4. Verify GitHub Pages site works end-to-end once first build completes.
+## Research Status
+| Stream | Status | Output |
+|---|---|---|
+| Competitor teardown | ✅ DONE | `COMPETITOR_TEARDOWN.md` |
+| GL Assessment 2026/27 landscape | ✅ DONE | `research/07-gl-landscape-2026.md` |
+| Pedagogy + progression for 9-11s | ✅ DONE | `research/08-pedagogy-and-progression.md` |
+| Item design + variety at scale | ✅ DONE | `research/09-item-design-and-variety.md` |
+| Per-subject skill tree blueprints | ✅ DONE | `research/10-skill-tree-blueprints.md` |
+| Content pipeline design | 🔜 Next | `research/11-content-pipeline.md` (optional — may synthesise inline instead) |
 
-## Key Decisions
-- **Every question must have a unique, provable answer.** If multiple mathematically or linguistically valid solutions exist, the question is broken.
-- Anagram/letter-set distractors must NOT be valid rearrangements of the letter set.
-- Connecting-word entries: answer forms a real compound both with w1 prefix AND w2 suffix; answer ≠ w1 and answer ≠ w2.
-- Hidden-word sentences must be grammatical natural English; the puzzle is whether the child can spot the hidden substring, not whether they can parse a broken sentence.
-- Balance-equation constraints must hold by construction, not by optimistic ordering.
-- Runtime validators where possible (hidden-words, anagrams, letter-sets) so broken data surfaces as a console warning and is silently filtered rather than shipped.
-- GitHub Pages deploys from `main` root; any `git push` re-deploys automatically.
+## Key Decisions Made
+- **Path A**: polish current PWA to SaaS-grade quality first; commercialise later.
+- **Scope**: GL Assessment only. Four subjects only (English, Maths, VR, NVR).
+- **Architecture**: skill trees (per-question-type progression towers), not flat 1-100 levels.
+- **Content model**: split — authored English + bank-based Verbal; keep Maths/NVR algorithmic.
+- **Pool size**: 2x initially agreed (1000 per subject) — may revise after blueprint absorbed.
+- **Positioning**: premium, GL-focused, super-selective-aware, grown-up tone. Differentiator vs Atom: depth + genuine difficulty calibration, not breadth.
 
-## Open Questions
-- Do the remaining question types (letter-codes, calculating-with-letters, etc.) have similar ambiguity bugs?
-- Should we add an automated unique-solution test harness?
-- What pass threshold to use when re-enabling level progression (e.g. 4/5, 3/5)?
+## Known Issues Still Outstanding
+1. **Sound button fix drafted but uncommitted** — `pronounceWord` property threaded through `english.js` (4 refs) + `question.js`. Not yet tested in-browser.
+2. **Severe content repetition** — comprehension 84% dup, language-analysis 40%, punctuation 28%. Full fix via skill-tree rebuild.
+3. **Level locking disabled** — all 100 levels unlocked for testing. Re-enable post-rebuild.
 
-## File Inventory
+## Remaining Overnight Plan Items
+1. ✅ Update PROJECT_STATUS.md
+2. ✅ Re-launch research agents
+3. ✅ Draft sound button fix
+4. ⏳ Scaffold content validator infrastructure (`scripts/` dir — not yet created)
+5. ⏳ Synthesise research doc 10 → concrete `js/data/trees/*.json` files
+6. ⏳ Begin content generation against blueprint
+7. ⏳ Commit work to git
+
+## Immediate Next Decision (awaiting user)
+- Option A: Commit current working-copy state first (safer base), then continue.
+- Option B: Plough on through validator scaffold + tree JSON synthesis, commit at end (faster, riskier if context resets again).
+
+## Build Phases (overall)
+1-7. ~~Skeleton → Question banks → Parent dashboard~~ DONE (POC-quality)
+8. Polish + PWA Hardening — partially done (superseded by Phase 9)
+9. **Content rebuild + skill trees + quality pipeline** — IN PROGRESS
+10. Commercialisation (backend, auth, payments, compliance) — DEFERRED
+
+## Key Files
 | File | Purpose |
 |------|---------|
-| `index.html` | SPA shell |
-| `manifest.json` | PWA manifest |
-| `sw.js` | Service worker (cache v15) |
-| `README.md` | Project overview |
-| `.gitignore` | Excludes local screenshots, OS/editor noise |
-| `css/styles.css` | All styles |
-| `js/app.js` | Entry point |
-| `js/router.js` | Hash-based router |
-| `js/storage.js` | IndexedDB wrapper |
-| `js/ui.js` | Shared UI components |
-| `js/timer.js` | Progressive timer + chime |
-| `js/views/*.js` | home, subject, intro, play, question, results, dashboard, dev |
-| `js/generators/difficulty.js` | Difficulty + topic map |
-| `js/generators/maths.js` | Maths generator |
-| `js/generators/english.js` | English generator |
-| `js/generators/verbal.js` | Verbal reasoning generator |
-| `js/generators/nonverbal.js` | NVR SVG generator |
-| `js/data/intro-content.js` | Intro + worked examples |
-| `assets/icons/*.svg` | App icons |
-| `research/*.md` | 6 research documents |
+| `CURRENT_STATE.md` | Snapshot of the POC as it stands today |
+| `PRODUCT_VISION_DRAFT.md` | Target state for Path A |
+| `RESEARCH_PLAN.md` | Research strategy + streams |
+| `COMPETITOR_TEARDOWN.md` | Competitive landscape analysis |
+| `PHASE9_ARCHITECTURE.md` | Engineering architecture for rebuild |
+| `research/01-06-*.md` | Earlier research (exam boards, subject overviews) |
+| `research/07-10-*.md` | Deep research (all landed) |
+| `js/generators/*.js` | Current POC generators (to be replaced subject by subject) |
+
+## Reminders for Next Session / User
+- Path A is locked; don't reopen the SaaS-rebuild debate.
+- User is non-technical — explain decisions in plain English.
+- User wants scale, not excuses — don't frame content volume as blocker.
+- Quality pipeline (validators, dedup, calibration) BEFORE bulk generation.
+- Commit research + architecture docs soon — they're valuable and currently only on disk.

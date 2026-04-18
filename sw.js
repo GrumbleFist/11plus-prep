@@ -1,4 +1,4 @@
-const CACHE_NAME = '11plus-v16';
+const CACHE_NAME = '11plus-v17';
 const ASSETS = [
   './',
   './index.html',

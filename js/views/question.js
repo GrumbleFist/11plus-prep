@@ -266,39 +266,42 @@ function playAnswerSound(isCorrect) {
 }
 
 // ---- Pronunciation helpers ----
+// Preferred path: question.pronounceWord is set explicitly by the generator.
+// Legacy fallback: topic + regex extraction for pre-Phase-9 questions.
 
 function shouldShowPronunciation(question) {
+  if (question.pronounceWord) return true;
   const topic = (question.topic || '').toLowerCase();
-  const prompt = (question.prompt || '').toLowerCase();
-  return topic === 'spelling' ||
-         topic === 'synonyms' ||
-         topic === 'antonyms' ||
-         prompt.includes('meaning to') ||
-         prompt.includes('opposite in meaning') ||
-         prompt.includes('correct spelling') ||
-         prompt.includes('closest in meaning');
+  return topic === 'spelling' || topic === 'synonyms' || topic === 'antonyms';
 }
 
 function extractPronounceWord(question) {
-  const prompt = question.prompt || '';
-  let match = prompt.match(/meaning to [""\u201c]([^""\u201d]+)[""\u201d]/);
-  if (match) return match[1];
-  match = prompt.match(/opposite.*to [""\u201c]([^""\u201d]+)[""\u201d]/);
-  if (match) return match[1];
-  if ((question.topic || '').toLowerCase() === 'spelling') {
-    if (question.correctIndex !== undefined && question.options) {
-      return question.options[question.correctIndex];
-    }
+  if (question.pronounceWord) return question.pronounceWord;
+  const topic = (question.topic || '').toLowerCase();
+  if (topic === 'spelling' && question.correctIndex !== undefined && question.options) {
+    return question.options[question.correctIndex];
   }
-  return null;
+  const prompt = question.prompt || '';
+  const m = prompt.match(/["\u201c\u2018]([A-Za-z][A-Za-z \-']{0,30})["\u201d\u2019]/);
+  return m ? m[1] : null;
 }
 
 function speakWord(word) {
-  if (!('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(word);
-  utterance.lang = 'en-GB';
-  utterance.rate = 0.85;
-  utterance.pitch = 1.0;
-  window.speechSynthesis.speak(utterance);
+  if (!('speechSynthesis' in window) || !word) return;
+  try {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(word);
+    u.lang = 'en-GB';
+    u.rate = 0.85;
+    u.pitch = 1.0;
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length > 0) {
+      const preferred = voices.find(v => v.lang === 'en-GB')
+        || voices.find(v => v.lang && v.lang.startsWith('en-'));
+      if (preferred) u.voice = preferred;
+    }
+    window.speechSynthesis.speak(u);
+  } catch (e) {
+    console.error('Speech synthesis failed:', e);
+  }
 }
