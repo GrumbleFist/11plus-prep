@@ -1,7 +1,7 @@
 # PROJECT_STATUS
 
 ## Last Updated
-2026-04-18 — Phase 9 scaffold complete, runtime wired to trees + banks, two English banks authoring underway. Pipeline end-to-end live on GitHub Pages.
+2026-04-18 — Phase 9 scaffold complete, runtime wired to trees + banks, two English banks authoring underway. Pipeline end-to-end live on GitHub Pages. User about to do first browser smoke test.
 
 ## Project Purpose
 PWA for 11+ GL Assessment exam preparation. Initially built for user's son (exam Sep 2027, superselective target). Path A locked: polish PWA to SaaS-grade first, commercialise later. GL Assessment only, four subjects only.
