@@ -9,7 +9,7 @@ import { navigate } from '../router.js';
 export function init() {}
 
 export function show() {
-  const view = document.getElementById('view-profile');
+  const view = document.getElementById('view-profiles');
   view.innerHTML = '';
 
   const hero = document.createElement('div');
