@@ -3,6 +3,8 @@
 import { SUBJECT_META, createBackButton } from '../ui.js';
 import { navigate } from '../router.js';
 import { getProgress, saveProgress } from '../storage.js';
+import { registerLevelComplete, launchConfetti, showBadgeToast, showLevelUpToast, xpProgress } from '../gamification.js';
+import { getTree } from '../data/loader.js';
 
 let lastResults = null;
 let lastSubject = null;
@@ -35,6 +37,35 @@ export async function show() {
   const avgTime = Math.round(lastResults.reduce((sum, r) => sum + r.timeTakenMs, 0) / total / 1000);
   const withinTime = lastResults.filter(r => r.withinTime).length;
   const passed = correct >= Math.ceil(total * 0.6); // 60% to pass
+  const perfect = correct === total;
+
+  // Detect gate level so we can award the bigger XP bonus
+  let isGate = false;
+  if (lastBranchId) {
+    try {
+      const tree = await getTree(lastSubject);
+      const branch = tree.branches.find(b => b.id === lastBranchId);
+      const levelDef = branch && (branch.levels || []).find(l => l.level === lastLevel);
+      if (levelDef && (levelDef.note === '5/5 gate' || levelDef.passThreshold === 1.0)) {
+        isGate = true;
+      }
+    } catch {}
+  }
+
+  // Gamification: award level-complete bonuses (XP, badges, level-up)
+  let gamify = { xpGained: 0, badges: [], leveledUp: false };
+  try {
+    gamify = registerLevelComplete({ score: correct, total, isGate });
+    if (perfect) launchConfetti();
+    if (gamify.badges && gamify.badges.length) {
+      gamify.badges.forEach((b, i) => setTimeout(() => showBadgeToast(b), 400 + i * 700));
+    }
+    if (gamify.leveledUp) {
+      setTimeout(() => showLevelUpToast(gamify.newLevel), 800);
+    }
+  } catch (err) {
+    console.warn('Gamification level-complete hook failed:', err);
+  }
 
   // Update progress if passed. Track per-branch progress when branchId is present,
   // otherwise keep writing to the legacy flat structure for backwards compatibility.
@@ -72,15 +103,36 @@ export async function show() {
   const header = document.createElement('div');
   header.className = 'results-header';
 
-  const emoji = score >= 80 ? '🌟' : score >= 60 ? '👍' : '💪';
-  const message = score >= 80 ? 'Brilliant!' : score >= 60 ? 'Well done!' : 'Keep practising!';
+  const emoji = perfect ? '🏆' : score >= 80 ? '🌟' : score >= 60 ? '👍' : '💪';
+  const message = perfect
+    ? 'Perfect!'
+    : score >= 80 ? 'Brilliant!' : score >= 60 ? 'Well done!' : 'Keep practising!';
 
   header.innerHTML = `
-    <div class="results-emoji">${emoji}</div>
+    <div class="results-emoji ${perfect ? 'results-emoji-perfect' : ''}">${emoji}</div>
     <h2 class="results-message">${message}</h2>
     ${lastLevel ? `<p class="results-level">Level ${lastLevel} — ${meta.name}</p>` : `<p class="results-level">${meta.name}</p>`}
   `;
   view.appendChild(header);
+
+  // XP reward panel
+  if (gamify.xpGained > 0) {
+    const prog = xpProgress();
+    const xpCard = document.createElement('div');
+    xpCard.className = 'xp-reward-card';
+    xpCard.innerHTML = `
+      <div class="xp-reward-top">
+        <span class="xp-reward-icon">⭐</span>
+        <span class="xp-reward-amount">+${gamify.xpGained} XP</span>
+        ${isGate && perfect ? '<span class="xp-reward-tag">Gate mastered</span>' : perfect ? '<span class="xp-reward-tag">Perfect bonus</span>' : ''}
+      </div>
+      <div class="xp-reward-bar">
+        <div class="xp-reward-fill" style="width:${prog.pctToNext}%"></div>
+      </div>
+      <div class="xp-reward-sub">${prog.title} · Level ${prog.level} · ${prog.intoLevel} / ${prog.spanToNext} XP</div>
+    `;
+    view.appendChild(xpCard);
+  }
 
   // Score card
   const scoreCard = document.createElement('div');

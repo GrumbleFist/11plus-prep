@@ -1,4 +1,4 @@
-const CACHE_NAME = '11plus-v22';
+const CACHE_NAME = '11plus-v23';
 const ASSETS = [
   './',
   './index.html',
@@ -8,6 +8,7 @@ const ASSETS = [
   './js/storage.js',
   './js/ui.js',
   './js/timer.js',
+  './js/gamification.js',
   './js/views/home.js',
   './js/views/question.js',
   './js/views/dev.js',

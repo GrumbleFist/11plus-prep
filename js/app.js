@@ -2,6 +2,7 @@
 
 import { registerView, init as initRouter } from './router.js';
 import { init as initStorage } from './storage.js';
+import { updateDailyStreak } from './gamification.js';
 import * as homeView from './views/home.js';
 import * as questionView from './views/question.js';
 import * as devView from './views/dev.js';
@@ -17,6 +18,13 @@ async function start() {
     await initStorage();
   } catch (err) {
     console.error('Storage init failed:', err);
+  }
+
+  // Bump daily-streak counter on first interaction of the day
+  try {
+    updateDailyStreak();
+  } catch (err) {
+    console.warn('Daily streak update failed:', err);
   }
 
   // Register views

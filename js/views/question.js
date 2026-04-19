@@ -5,6 +5,7 @@ import { SUBJECT_META, renderOptions, showAnswerState, renderExplanation, showFe
 import { saveAnswer } from '../storage.js';
 import { startTimer, stopTimer, getTimeAllowed, formatTime, getTimerState } from '../timer.js';
 import { navigate } from '../router.js';
+import { registerAnswer, resetSessionStreak, getSessionStreak, showXPGain, showStreakPulse, showBadgeToast, showLevelUpToast } from '../gamification.js';
 
 function escapeHtml(text) {
   const div = document.createElement('div');
@@ -36,6 +37,7 @@ export function startSequence(questions, subject, level, onDone) {
   currentIndex = 0;
   onComplete = onDone;
   answeredResults = [];
+  resetSessionStreak();
   navigate('#/question');
 }
 
@@ -66,9 +68,14 @@ function showQuestion(index) {
   // Header
   const header = document.createElement('div');
   header.className = 'question-header';
+  const streak = getSessionStreak();
+  const streakBadge = streak >= 2
+    ? `<span class="streak-badge">🔥 ${streak}</span>`
+    : '';
   header.innerHTML = `
     <span class="question-progress">Question ${index + 1} of ${total}</span>
     <span class="question-subject-badge badge-${meta.color}">${meta.name}</span>
+    ${streakBadge}
   `;
   view.appendChild(header);
 
@@ -196,6 +203,21 @@ function handleAnswer(selectedIndex, grid, view) {
 
   answeredResults.push(answer);
   saveAnswer(answer).catch(err => console.error('Failed to save answer:', err));
+
+  // Gamification: XP, streak, badges
+  try {
+    const gamify = registerAnswer(isCorrect, answer.withinTime);
+    if (gamify.xpGained > 0) showXPGain(gamify.xpGained);
+    if (gamify.currentStreak >= 3 && isCorrect) showStreakPulse(gamify.currentStreak);
+    if (gamify.badges && gamify.badges.length) {
+      gamify.badges.forEach((b, i) => setTimeout(() => showBadgeToast(b), 300 + i * 600));
+    }
+    if (gamify.leveledUp) {
+      setTimeout(() => showLevelUpToast(gamify.newLevel), 600);
+    }
+  } catch (err) {
+    console.warn('Gamification hook failed:', err);
+  }
 
   // Next button
   const isLast = currentIndex >= currentQuestions.length - 1;

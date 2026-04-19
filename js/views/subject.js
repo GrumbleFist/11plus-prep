@@ -6,6 +6,7 @@ import { SUBJECT_META, createBackButton } from '../ui.js';
 import { navigate } from '../router.js';
 import { getProgress } from '../storage.js';
 import { getTree } from '../data/loader.js';
+import { renderLearnerBanner } from '../gamification.js';
 
 export function init() {}
 
@@ -32,7 +33,7 @@ export async function show(subject) {
   const progress = (await getProgress(subject)) || {};
   const branchProgress = progress.branches || {};
 
-  view.innerHTML = '';
+  view.innerHTML = renderLearnerBanner();
 
   // Header
   const header = document.createElement('div');
@@ -74,15 +75,22 @@ export async function show(subject) {
     const section = document.createElement('section');
     section.className = 'branch-section';
 
+    const mastered = completedSet.size >= branch.levelCount && branch.levelCount > 0;
+    const branchPct = branch.levelCount > 0 ? (completedSet.size / branch.levelCount) * 100 : 0;
+    if (mastered) section.classList.add('branch-mastered');
+
     const brHeader = document.createElement('header');
     brHeader.className = 'branch-header';
     brHeader.innerHTML = `
       <div class="branch-title-row">
-        <h3 class="branch-title">${branch.displayName}</h3>
+        <h3 class="branch-title">${branch.displayName}${mastered ? ' <span class="branch-crown">👑</span>' : ''}</h3>
         ${branch.childFriendlyName ? `<span class="branch-friendly">${branch.childFriendlyName}</span>` : ''}
       </div>
       <p class="branch-desc">${branch.description || ''}</p>
-      <p class="branch-progress-text">${completedSet.size} / ${branch.levelCount} levels</p>
+      <div class="branch-progress-row">
+        <div class="branch-progress-bar"><div class="branch-progress-fill fill-${meta.color}" style="width:${branchPct}%"></div></div>
+        <span class="branch-progress-text">${completedSet.size} / ${branch.levelCount}</span>
+      </div>
     `;
     section.appendChild(brHeader);
 
