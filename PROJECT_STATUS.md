@@ -1,7 +1,7 @@
 # PROJECT_STATUS
 
 ## Last Updated
-2026-04-19 — Cloze + synonyms-antonyms banks shipped (270 items, validator clean). Gamification layer live: XP, streaks, badges, confetti, learner banner. Seven of seven English banks no longer blocked by content gaps for the core English flow (spelling, vocabulary, cloze, synonyms-antonyms now authored). UI awaiting in-browser smoke test.
+2026-04-19 (second pass) — Cloze + synonyms-antonyms banks shipped (270 items, validator clean). Gamification layer live: XP, streaks, badges, confetti, learner banner. Four of seven English banks authored (spelling, vocabulary, cloze, synonyms-antonyms = 770 items). Gamified UI awaiting in-browser smoke test by user.
 
 ## Project Purpose
 PWA for 11+ GL Assessment exam preparation. Initially built for user's son (exam Sep 2027, superselective target). Path A locked: polish PWA to SaaS-grade first, commercialise later. GL Assessment only, four subjects only.
