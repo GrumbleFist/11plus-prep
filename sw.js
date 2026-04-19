@@ -1,4 +1,4 @@
-const CACHE_NAME = '11plus-v21';
+const CACHE_NAME = '11plus-v22';
 const ASSETS = [
   './',
   './index.html',
@@ -31,6 +31,7 @@ const ASSETS = [
   './js/data/banks/english/spelling.json',
   './js/data/banks/english/vocabulary.json',
   './js/data/banks/english/cloze.json',
+  './js/data/banks/english/synonyms-antonyms.json',
   './manifest.json'
 ];
 
