@@ -1,5 +1,7 @@
 // Hash-based SPA router
-// Routes: #/ (home), #/dev, #/question/:subject/:index, #/dashboard
+// Routes: #/profiles (picker), #/ (home), #/dev, #/question/:subject/:index, #/dashboard
+
+import { getActiveProfile } from './profiles.js';
 
 const views = {};
 let currentView = null;
@@ -25,6 +27,12 @@ function handleRoute() {
 
   // Map route names to view names
   const viewName = route === '' ? 'home' : route;
+
+  // Profile gate: block every view except the picker until a profile is active.
+  if (viewName !== 'profiles' && !getActiveProfile()) {
+    navigate('#/profiles');
+    return;
+  }
 
   // Hide ALL views first (prevents stale content showing)
   Object.keys(views).forEach(name => {

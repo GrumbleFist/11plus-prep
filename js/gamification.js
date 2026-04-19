@@ -2,7 +2,13 @@
 // Persists to localStorage (synchronous, no DB round-trip).
 // Emits custom events so views can react to level-ups and badge awards.
 
-const STORAGE_KEY = '11plus-learner';
+import { getActiveProfile } from './profiles.js';
+
+const BASE_STORAGE_KEY = '11plus-learner';
+function storageKey() {
+  const id = getActiveProfile() || 'guest';
+  return `${BASE_STORAGE_KEY}-${id}`;
+}
 
 const XP = {
   CORRECT: 10,
@@ -56,7 +62,7 @@ function defaultState() {
 
 function load() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey());
     if (!raw) return defaultState();
     return { ...defaultState(), ...JSON.parse(raw) };
   } catch {
@@ -66,7 +72,7 @@ function load() {
 
 function save(state) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(storageKey(), JSON.stringify(state));
   } catch (e) {
     console.warn('Failed to save learner state:', e);
   }

@@ -1,12 +1,21 @@
-// IndexedDB wrapper for progress and answer storage
+// IndexedDB wrapper for progress and answer storage.
+// Each profile gets its own database ("11plus-dorothy", "11plus-arnold"),
+// so per-kid progress never mixes.
 
-const DB_NAME = '11plus';
 const DB_VERSION = 1;
 let db = null;
+let currentProfile = null;
 
-export async function init() {
+export function isReady() { return db !== null; }
+
+export async function init(profileId) {
+  if (!profileId) throw new Error('storage.init requires a profileId');
+  if (db && currentProfile === profileId) return;
+  if (db) { try { db.close(); } catch {} db = null; }
+  currentProfile = profileId;
+  const dbName = `11plus-${profileId}`;
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    const request = indexedDB.open(dbName, DB_VERSION);
 
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
