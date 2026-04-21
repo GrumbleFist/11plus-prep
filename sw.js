@@ -1,4 +1,4 @@
-const CACHE_NAME = '11plus-v26';
+const CACHE_NAME = '11plus-v27';
 const IMAGE_CACHE = '11plus-images-v1';
 
 const ASSETS = [
@@ -11,6 +11,7 @@ const ASSETS = [
   './js/ui.js',
   './js/timer.js',
   './js/gamification.js',
+  './js/badges.js',
   './js/profiles.js',
   './js/views/home.js',
   './js/views/question.js',

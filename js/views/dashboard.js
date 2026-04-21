@@ -3,6 +3,8 @@
 import { SUBJECT_META, createBackButton } from '../ui.js';
 import { navigate } from '../router.js';
 import { getAnswers, getAllProgress } from '../storage.js';
+import { renderLearnerBanner } from '../gamification.js';
+import { renderBadgeGallery } from '../badges.js';
 
 export function init() {}
 
@@ -42,9 +44,22 @@ export async function show() {
     return;
   }
 
+  // Learner banner — XP, level, daily streak
+  const bannerWrap = document.createElement('div');
+  bannerWrap.innerHTML = renderLearnerBanner();
+  view.appendChild(bannerWrap.firstElementChild);
+
   // Overview cards
   const overview = buildOverview(allAnswers, allProgress);
   view.appendChild(overview);
+
+  // Achievement gallery — earned + locked, grouped by category
+  try {
+    const gallery = await renderBadgeGallery({ compact: true });
+    view.appendChild(gallery);
+  } catch (err) {
+    console.warn('Dashboard badge gallery render failed:', err);
+  }
 
   // Subject breakdown
   const subjectSection = buildSubjectBreakdown(allAnswers, allProgress);

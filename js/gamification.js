@@ -1,6 +1,7 @@
 // Gamification — XP, learner level, streaks, daily streak, badges.
 // Persists to localStorage (synchronous, no DB round-trip).
-// Emits custom events so views can react to level-ups and badge awards.
+// Badges awarded here go into `pendingBadges`; the badges.js modal
+// drains that queue at end-of-level so nothing interrupts mid-play.
 
 import { getActiveProfile } from './profiles.js';
 
@@ -31,6 +32,28 @@ const LEARNER_TITLES = [
   'Mastermind'
 ];
 
+const TIER_ICONS = ['⭐', '🌱', '📘', '🎓', '🏅', '💎', '👑', '⚡', '🌟', '🧠'];
+
+// Static catalogue — exported so badges.js can render the gallery.
+export const TIER_BADGES = LEARNER_TITLES.map((title, i) => ({
+  key: `tier-${i + 1}`,
+  label: `${title} (Level ${i + 1})`,
+  icon: TIER_ICONS[i],
+  description: `Reach learner Level ${i + 1}.`,
+  category: 'XP Tiers',
+  tier: i + 1
+}));
+
+export const MISC_BADGES = [
+  { key: 'streak3',      label: 'On Fire!',           icon: '🔥', description: '3 correct answers in a row.', category: 'Streaks' },
+  { key: 'streak5',      label: 'Unstoppable!',       icon: '⚡', description: '5 correct answers in a row.', category: 'Streaks' },
+  { key: 'streak10',     label: 'Legendary Streak!',  icon: '🌟', description: '10 correct answers in a row.', category: 'Streaks' },
+  { key: 'perfectScore', label: 'Perfect Score!',     icon: '💯', description: 'Scored full marks on a level.', category: 'Mastery' },
+  { key: 'gateMaster',   label: 'Gate Master!',       icon: '🏆', description: 'Passed a 5/5 gate level.', category: 'Mastery' }
+];
+
+const MISC_BY_KEY = Object.fromEntries(MISC_BADGES.map(b => [b.key, b]));
+
 // Cumulative XP required to reach each learner level.
 // L1=0, L2=100, L3=300, L4=600, L5=1000, L6=1500, ... triangular growth.
 function xpThreshold(level) {
@@ -53,6 +76,7 @@ function defaultState() {
     dailyStreak: 0,
     lastPlayedDate: null,
     badges: {},
+    pendingBadges: [],
     totalCorrect: 0,
     totalAnswered: 0,
     totalLevelsPassed: 0,
@@ -109,19 +133,37 @@ export function xpProgress() {
   };
 }
 
-function addXP(state, amount) {
+// Award a badge by full meta object. Records earned-date in state.badges
+// and adds the meta to state.pendingBadges so the modal can surface it.
+// Returns the meta if newly awarded, null if it was already earned.
+function awardBadgeMeta(state, meta) {
+  if (!meta || !meta.key) return null;
+  if (state.badges[meta.key]) return null;
+  state.badges[meta.key] = new Date().toISOString();
+  state.pendingBadges = state.pendingBadges || [];
+  if (!state.pendingBadges.some(b => b.key === meta.key)) {
+    state.pendingBadges.push({ ...meta, earnedAt: state.badges[meta.key] });
+  }
+  return meta;
+}
+
+function awardTierBadges(state, prevLevel, newLevel, events) {
+  for (let t = prevLevel + 1; t <= newLevel; t++) {
+    const meta = TIER_BADGES[t - 1];
+    const awarded = awardBadgeMeta(state, meta);
+    if (awarded) events.badges.push(awarded);
+  }
+}
+
+function addXP(state, amount, events) {
   if (amount <= 0) return { leveledUp: false };
   const prevLevel = state.learnerLevel;
   state.xp += amount;
   const newLevel = levelFromXP(state.xp);
   state.learnerLevel = newLevel;
-  return { leveledUp: newLevel > prevLevel, prevLevel, newLevel };
-}
-
-function awardBadge(state, key) {
-  if (state.badges[key]) return false;
-  state.badges[key] = new Date().toISOString();
-  return true;
+  const leveledUp = newLevel > prevLevel;
+  if (leveledUp && events) awardTierBadges(state, prevLevel, newLevel, events);
+  return { leveledUp, prevLevel, newLevel };
 }
 
 export function registerAnswer(isCorrect, withinTime) {
@@ -140,17 +182,20 @@ export function registerAnswer(isCorrect, withinTime) {
 
     if (sessionStreak > state.bestStreak) state.bestStreak = sessionStreak;
 
-    if (sessionStreak === 3 && awardBadge(state, 'streak3')) {
-      events.badges.push({ key: 'streak3', label: 'On Fire!', icon: '🔥' });
+    if (sessionStreak === 3) {
+      const a = awardBadgeMeta(state, MISC_BY_KEY.streak3);
+      if (a) events.badges.push(a);
     }
-    if (sessionStreak === 5 && awardBadge(state, 'streak5')) {
-      events.badges.push({ key: 'streak5', label: 'Unstoppable!', icon: '⚡' });
+    if (sessionStreak === 5) {
+      const a = awardBadgeMeta(state, MISC_BY_KEY.streak5);
+      if (a) events.badges.push(a);
     }
-    if (sessionStreak === 10 && awardBadge(state, 'streak10')) {
-      events.badges.push({ key: 'streak10', label: 'Legendary Streak!', icon: '🌟' });
+    if (sessionStreak === 10) {
+      const a = awardBadgeMeta(state, MISC_BY_KEY.streak10);
+      if (a) events.badges.push(a);
     }
 
-    const levelEvent = addXP(state, gain);
+    const levelEvent = addXP(state, gain, events);
     events.leveledUp = levelEvent.leveledUp;
     events.prevLevel = levelEvent.prevLevel;
     events.newLevel = levelEvent.newLevel;
@@ -175,19 +220,17 @@ export function registerLevelComplete({ score, total, isGate }) {
   if (perfect) {
     events.perfect = true;
     events.xpGained += XP.PERFECT_LEVEL;
-    if (awardBadge(state, 'perfectScore')) {
-      events.badges.push({ key: 'perfectScore', label: 'Perfect Score!', icon: '💯' });
-    }
+    const a = awardBadgeMeta(state, MISC_BY_KEY.perfectScore);
+    if (a) events.badges.push(a);
     if (isGate) {
       events.xpGained += XP.GATE_PASS;
-      if (awardBadge(state, 'gateMaster')) {
-        events.badges.push({ key: 'gateMaster', label: 'Gate Master!', icon: '🏆' });
-      }
+      const g = awardBadgeMeta(state, MISC_BY_KEY.gateMaster);
+      if (g) events.badges.push(g);
     }
   }
 
   if (events.xpGained > 0) {
-    const levelEvent = addXP(state, events.xpGained);
+    const levelEvent = addXP(state, events.xpGained, events);
     events.leveledUp = levelEvent.leveledUp;
     events.prevLevel = levelEvent.prevLevel;
     events.newLevel = levelEvent.newLevel;
@@ -195,6 +238,31 @@ export function registerLevelComplete({ score, total, isGate }) {
 
   save(state);
   return events;
+}
+
+// External hook: other modules (e.g. results.js) call this to grant
+// branch/subject badges once they detect a completion condition.
+export function awardExternalBadge(meta) {
+  const state = load();
+  const awarded = awardBadgeMeta(state, meta);
+  save(state);
+  return awarded;
+}
+
+export function getPendingBadges() {
+  return (load().pendingBadges || []).slice();
+}
+
+export function acceptPendingBadge(key) {
+  const state = load();
+  state.pendingBadges = (state.pendingBadges || []).filter(b => b.key !== key);
+  save(state);
+}
+
+export function clearAllPendingBadges() {
+  const state = load();
+  state.pendingBadges = [];
+  save(state);
 }
 
 export function updateDailyStreak() {
@@ -283,24 +351,6 @@ export function showLevelUpToast(newLevel) {
     toast.classList.remove('show');
     setTimeout(() => toast.remove(), 400);
   }, 3000);
-}
-
-export function showBadgeToast(badge) {
-  const toast = document.createElement('div');
-  toast.className = 'gamify-toast gamify-toast-badge';
-  toast.innerHTML = `
-    <div class="gamify-toast-icon">${badge.icon}</div>
-    <div class="gamify-toast-body">
-      <div class="gamify-toast-title">${badge.label}</div>
-      <div class="gamify-toast-sub">Badge earned</div>
-    </div>
-  `;
-  document.body.appendChild(toast);
-  setTimeout(() => toast.classList.add('show'), 20);
-  setTimeout(() => {
-    toast.classList.remove('show');
-    setTimeout(() => toast.remove(), 400);
-  }, 2500);
 }
 
 export function showXPGain(amount) {

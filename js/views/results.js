@@ -3,8 +3,16 @@
 import { SUBJECT_META, createBackButton } from '../ui.js';
 import { navigate } from '../router.js';
 import { getProgress, saveProgress } from '../storage.js';
-import { registerLevelComplete, launchConfetti, showBadgeToast, showLevelUpToast, xpProgress } from '../gamification.js';
+import { registerLevelComplete, launchConfetti, showLevelUpToast, xpProgress, awardExternalBadge } from '../gamification.js';
 import { getTree } from '../data/loader.js';
+import {
+  getBranchBadgeMeta,
+  getSubjectBadgeMeta,
+  isBranchComplete,
+  isSubjectComplete,
+  showPendingBadges,
+  renderBadgeGallery
+} from '../badges.js';
 
 let lastResults = null;
 let lastSubject = null;
@@ -52,14 +60,13 @@ export async function show() {
     } catch {}
   }
 
-  // Gamification: award level-complete bonuses (XP, badges, level-up)
+  // Gamification: award level-complete bonuses (XP, badges, level-up).
+  // Badges (perfect/gate/tier) go into the pending-badge queue and are
+  // surfaced by the modal at the end of this function.
   let gamify = { xpGained: 0, badges: [], leveledUp: false };
   try {
     gamify = registerLevelComplete({ score: correct, total, isGate });
     if (perfect) launchConfetti();
-    if (gamify.badges && gamify.badges.length) {
-      gamify.badges.forEach((b, i) => setTimeout(() => showBadgeToast(b), 400 + i * 700));
-    }
     if (gamify.leveledUp) {
       setTimeout(() => showLevelUpToast(gamify.newLevel), 800);
     }
@@ -94,6 +101,27 @@ export async function show() {
       }
 
       await saveProgress(progress);
+
+      // Detect branch/subject completion and award the matching badges.
+      // These go into the pending-badge queue; the modal drains it below.
+      if (lastBranchId) {
+        try {
+          const branchDone = await isBranchComplete(lastSubject, lastBranchId, progress);
+          if (branchDone) {
+            const tree = await getTree(lastSubject);
+            const branchDef = tree.branches.find(b => b.id === lastBranchId);
+            const branchLabel = branchDef?.childFriendlyName || branchDef?.displayName || lastBranchId;
+            awardExternalBadge(getBranchBadgeMeta(lastSubject, lastBranchId, branchLabel));
+
+            const subjectDone = await isSubjectComplete(lastSubject, progress);
+            if (subjectDone) {
+              awardExternalBadge(getSubjectBadgeMeta(lastSubject));
+            }
+          }
+        } catch (err) {
+          console.warn('Completion badge check failed:', err);
+        }
+      }
     } catch (err) {
       console.error('Failed to save progress:', err);
     }
@@ -221,6 +249,21 @@ export async function show() {
   actions.appendChild(homeBtn);
 
   view.appendChild(actions);
+
+  // Achievement gallery — shows earned + locked badges, grouped by category.
+  // Compact mode = collapsed by default so it doesn't drown the score card.
+  try {
+    const gallery = await renderBadgeGallery({ compact: true });
+    view.appendChild(gallery);
+  } catch (err) {
+    console.warn('Badge gallery render failed:', err);
+  }
+
+  // Surface any pending (unclaimed) achievements. Kid must click "Awesome!"
+  // on each one before the modal dismisses.
+  setTimeout(() => {
+    try { showPendingBadges(); } catch (err) { console.warn('Pending badge modal failed:', err); }
+  }, 600);
 
   // Clear last results
   // (keep them until user navigates away so back button works)

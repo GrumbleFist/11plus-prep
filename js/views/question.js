@@ -5,7 +5,7 @@ import { SUBJECT_META, renderOptions, showAnswerState, renderExplanation, showFe
 import { saveAnswer } from '../storage.js';
 import { startTimer, stopTimer, getTimeAllowed, formatTime, getTimerState } from '../timer.js';
 import { navigate } from '../router.js';
-import { registerAnswer, resetSessionStreak, getSessionStreak, showXPGain, showStreakPulse, showBadgeToast, showLevelUpToast } from '../gamification.js';
+import { registerAnswer, resetSessionStreak, getSessionStreak, showXPGain, showStreakPulse, showLevelUpToast } from '../gamification.js';
 
 function escapeHtml(text) {
   const div = document.createElement('div');
@@ -204,14 +204,13 @@ function handleAnswer(selectedIndex, grid, view) {
   answeredResults.push(answer);
   saveAnswer(answer).catch(err => console.error('Failed to save answer:', err));
 
-  // Gamification: XP, streak, badges
+  // Gamification: XP + streak feedback fires mid-question; badges are
+  // queued silently and surfaced via the modal on the results screen so
+  // they don't interrupt gameplay.
   try {
     const gamify = registerAnswer(isCorrect, answer.withinTime);
     if (gamify.xpGained > 0) showXPGain(gamify.xpGained);
     if (gamify.currentStreak >= 3 && isCorrect) showStreakPulse(gamify.currentStreak);
-    if (gamify.badges && gamify.badges.length) {
-      gamify.badges.forEach((b, i) => setTimeout(() => showBadgeToast(b), 300 + i * 600));
-    }
     if (gamify.leveledUp) {
       setTimeout(() => showLevelUpToast(gamify.newLevel), 600);
     }
