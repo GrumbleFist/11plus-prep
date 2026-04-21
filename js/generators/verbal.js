@@ -18,6 +18,24 @@ function uniquePick(bank, level, index) {
   return bank[hash % bank.length];
 }
 
+// Branch-aware seed: same (branch, level) always produces the same pool permutation,
+// but different branches at the same level get different permutations.
+function branchSeed(branchId, level) {
+  const s = `${branchId || '_'}:${level}`;
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+  return (h >>> 0) || 1;
+}
+function seededShuffle(arr, seed) {
+  const rng = seededRNG(seed);
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 // ===================== THREE-LETTER WORDS =====================
 
 const THREE_LETTER_WORDS = [
@@ -554,8 +572,8 @@ function letterSequenceQuestion(level, index, rng) {
 
 // ===================== COMPOUND WORDS =====================
 
-function compoundWordQuestion(level, index, rng) {
-  const pair = uniquePick(COMPOUND_PAIRS, level, index);
+function compoundWordQuestion(entry, rng) {
+  const pair = entry;
   const type = randInt(rng, 0, 1);
 
   if (type === 0) {
@@ -582,8 +600,8 @@ function compoundWordQuestion(level, index, rng) {
 
 // ===================== HIDDEN WORDS =====================
 
-function makeHiddenWordQuestion(level, index, rng) {
-  const p = uniquePick(HIDDEN_WORD_PUZZLES, level, index);
+function makeHiddenWordQuestion(entry, rng) {
+  const p = entry;
   const wrongWords = ['COAT', 'BEAR', 'FISH', 'STAR', 'LAMP', 'TREE', 'MOON', 'GATE', 'KING', 'BELL',
     'FROG', 'CAKE', 'BOAT', 'NEST', 'PLAY', 'ROSE', 'SEED', 'WAVE', 'GOLD', 'SILK',
     'HERO', 'LEAF', 'SAIL', 'TUNE', 'PALM', 'ARCH', 'DOME', 'HELM', 'CLAW', 'HAZE'];
@@ -599,8 +617,8 @@ function makeHiddenWordQuestion(level, index, rng) {
 
 // ===================== WORD ANALOGIES =====================
 
-function wordAnalogyQuestion(level, index, rng) {
-  const a = uniquePick(ANALOGIES, level, index);
+function wordAnalogyQuestion(entry, rng) {
+  const a = entry;
   const wrongs = shuffle(rng, ANALOGIES.filter(x => x !== a).map(x => x.d)).slice(0, 4);
   const options = shuffle(rng, [a.d, ...wrongs]);
   return {
@@ -612,8 +630,7 @@ function wordAnalogyQuestion(level, index, rng) {
 
 // ===================== ODD WORD OUT =====================
 
-function oddWordOutQuestion(level, index, rng) {
-  const entry = uniquePick(ODD_WORD_GROUPS, level, index);
+function oddWordOutQuestion(entry, rng) {
   const options = shuffle(rng, [...entry.group, entry.odd]);
   return {
     prompt: 'Which word is the odd one out?',
@@ -624,8 +641,8 @@ function oddWordOutQuestion(level, index, rng) {
 
 // ===================== ANAGRAMS =====================
 
-function anagramQuestion(level, index, rng) {
-  const a = uniquePick(ANAGRAMS, level, index);
+function anagramQuestion(entry, rng) {
+  const a = entry;
   const options = shuffle(rng, [a.answer, ...a.wrongs.slice(0, 4)]);
   return {
     prompt: `Rearrange the letters to make a word:\n\n${a.jumbled}`,
@@ -636,8 +653,8 @@ function anagramQuestion(level, index, rng) {
 
 // ===================== CONNECTING WORDS =====================
 
-function connectingWordsQuestion(level, index, rng) {
-  const v = uniquePick(CONNECTING_WORDS, level, index);
+function connectingWordsQuestion(entry, rng) {
+  const v = entry;
   const options = shuffle(rng, [v.answer, ...v.wrongs]);
   return {
     prompt: `Which word can go after "${v.w1}" and before "${v.w2}" to make two new words?`,
@@ -648,8 +665,8 @@ function connectingWordsQuestion(level, index, rng) {
 
 // ===================== MISSING THREE-LETTER WORD =====================
 
-function missingThreeLetterWord(level, index, rng) {
-  const s = uniquePick(MISSING_WORD_SENTENCES, level, index);
+function missingThreeLetterWord(entry, rng) {
+  const s = entry;
   const options = shuffle(rng, [s.answer, ...s.wrongs]);
   return {
     prompt: `Which three-letter word best completes the sentence?\n\n${s.text}`,
@@ -660,8 +677,8 @@ function missingThreeLetterWord(level, index, rng) {
 
 // ===================== CREATE A WORD =====================
 
-function createAWordQuestion(level, index, rng) {
-  const ls = uniquePick(LETTER_SETS, level, index);
+function createAWordQuestion(entry, rng) {
+  const ls = entry;
   // Shuffle letters so they don't appear in the order that spells the answer.
   // Keep shuffling until the display order is NOT the same as the answer.
   let displayLetters = shuffle(rng, ls.letters);
@@ -885,50 +902,122 @@ function balanceEquation(level, index, rng) {
 
 // ===================== MASTER GENERATOR =====================
 
-const GENERATORS = {
-  'hidden-words': [makeHiddenWordQuestion],
-  'number-sequences': [numberSequenceQuestion],
-  'compound-words': [compoundWordQuestion],
-  'synonyms-antonyms': [wordAnalogyQuestion, oddWordOutQuestion],
-  'letter-sequences': [letterSequenceQuestion],
-  'letter-codes': [letterCodeQuestion],
-  'move-a-letter': [anagramQuestion],
-  'missing-three-letter-word': [missingThreeLetterWord],
-  'word-number-codes': [wordNumberCodeQuestion],
-  'word-analogies': [wordAnalogyQuestion],
-  'connecting-words': [connectingWordsQuestion],
-  'odd-words-out': [oddWordOutQuestion],
-  'calculating-with-letters': [calculatingWithLetters],
-  'number-relationships': [numberSequenceQuestion, calculatingWithLetters],
-  'balance-equations': [balanceEquation],
-  'create-a-word': [createAWordQuestion, anagramQuestion],
-  'logic-problems': [logicProblemQuestion],
-  'complex-letter-codes': [letterCodeQuestion, letterSequenceQuestion],
-  'multi-step-codes': [wordNumberCodeQuestion, letterCodeQuestion, balanceEquation],
+// Which pool a pool-based builder draws from. Lets the master generator
+// shuffle the pool deterministically and feed entries one at a time so
+// that no two questions within a single level are duplicates.
+const POOL_MAP = new Map([
+  [compoundWordQuestion, COMPOUND_PAIRS],
+  [makeHiddenWordQuestion, HIDDEN_WORD_PUZZLES],
+  [wordAnalogyQuestion, ANALOGIES],
+  [oddWordOutQuestion, ODD_WORD_GROUPS],
+  [anagramQuestion, ANAGRAMS],
+  [connectingWordsQuestion, CONNECTING_WORDS],
+  [missingThreeLetterWord, MISSING_WORD_SENTENCES],
+  [createAWordQuestion, LETTER_SETS],
+]);
+
+// Route each tree branch ID to its generator so the question TYPE matches
+// the branch TITLE the child saw. 16/21 are perfect matches; the remaining
+// 5 use the closest available generator until dedicated banks land.
+const BRANCH_GENERATORS = {
+  'A-insert-letter': makeHiddenWordQuestion,
+  'B-odd-two-out': oddWordOutQuestion,
+  'C-letter-codes': letterCodeQuestion,
+  'D-synonyms': wordAnalogyQuestion,
+  'E-hidden-word': makeHiddenWordQuestion,
+  'F-missing-three-letter': missingThreeLetterWord,
+  'G-calculating-letters': calculatingWithLetters,
+  'H-antonyms': wordAnalogyQuestion,
+  'I-complete-calculation': balanceEquation,
+  'J-move-letter': anagramQuestion,
+  'K-number-relationships': numberSequenceQuestion,
+  'L-letter-sequences': letterSequenceQuestion,
+  'M-word-analogies': wordAnalogyQuestion,
+  'N-word-number-codes': wordNumberCodeQuestion,
+  'O-complete-word-pairs': anagramQuestion,
+  'P-number-sequences': numberSequenceQuestion,
+  'Q-compound-words': compoundWordQuestion,
+  'R-create-word': createAWordQuestion,
+  'S-connecting-word': connectingWordsQuestion,
+  'U-letter-analogies': letterSequenceQuestion,
+  'Z-reading-logic': logicProblemQuestion,
 };
 
-export function generateVerbalQuestions(level, count = 5) {
-  const topic = getTopicForLevel('verbal', level);
-  const params = getDifficultyParams(level, 'verbal');
-  const gens = GENERATORS[topic] || [numberSequenceQuestion];
-  const questions = [];
+// Legacy topic → generator fallback (only hit if no branchId is supplied)
+const LEGACY_TOPIC_GENERATORS = {
+  'hidden-words': makeHiddenWordQuestion,
+  'number-sequences': numberSequenceQuestion,
+  'compound-words': compoundWordQuestion,
+  'synonyms-antonyms': wordAnalogyQuestion,
+  'letter-sequences': letterSequenceQuestion,
+  'letter-codes': letterCodeQuestion,
+  'move-a-letter': anagramQuestion,
+  'missing-three-letter-word': missingThreeLetterWord,
+  'word-number-codes': wordNumberCodeQuestion,
+  'word-analogies': wordAnalogyQuestion,
+  'connecting-words': connectingWordsQuestion,
+  'odd-words-out': oddWordOutQuestion,
+  'calculating-with-letters': calculatingWithLetters,
+  'number-relationships': numberSequenceQuestion,
+  'balance-equations': balanceEquation,
+  'create-a-word': createAWordQuestion,
+  'logic-problems': logicProblemQuestion,
+  'complex-letter-codes': letterCodeQuestion,
+  'multi-step-codes': wordNumberCodeQuestion,
+};
 
-  for (let i = 0; i < count; i++) {
-    const rng = seededRNG(makeSeed(level, i));
-    const gen = gens[i % gens.length];
-    const q = gen(level, i, rng);
-    questions.push({
-      id: `vr-${level}-${i}`,
-      subject: 'verbal',
-      topic,
-      level,
-      prompt: q.prompt,
-      options: q.options,
-      correctIndex: q.correctIndex,
-      timeAllowedSeconds: params.timeAllowedSeconds || 60,
-      explanation: q.explanation
-    });
+export function generateVerbalQuestions(level, count = 5, branchId = null) {
+  const params = getDifficultyParams(level, 'verbal');
+  const topic = branchId || getTopicForLevel('verbal', level);
+
+  let gen = BRANCH_GENERATORS[branchId];
+  if (!gen) gen = LEGACY_TOPIC_GENERATORS[topic] || numberSequenceQuestion;
+
+  const pool = POOL_MAP.get(gen);
+  const seed = branchSeed(branchId, level);
+  const questions = [];
+  const seenPrompts = new Set();
+
+  if (pool) {
+    // Pool-based: a deterministic shuffle of the full pool guarantees no
+    // two questions within this level share the same seed entry.
+    const shuffled = seededShuffle(pool, seed);
+    for (let i = 0; i < count; i++) {
+      const entry = shuffled[i % shuffled.length];
+      const rng = seededRNG(seed ^ (i * 2654435761));
+      const q = gen(entry, rng);
+      if (seenPrompts.has(q.prompt)) continue;
+      seenPrompts.add(q.prompt);
+      questions.push(wrapQuestion(q, level, questions.length, topic, params));
+    }
+  } else {
+    // Algorithmic: retry up to N times per slot if the generated prompt
+    // collides with one we've already accepted at this level.
+    for (let i = 0; i < count; i++) {
+      let q, tries = 0;
+      do {
+        const rng = seededRNG((seed ^ (i * 2654435761) ^ (tries * 40503)) >>> 0);
+        q = gen(level, i * 17 + tries, rng);
+        tries++;
+      } while (seenPrompts.has(q.prompt) && tries < 12);
+      seenPrompts.add(q.prompt);
+      questions.push(wrapQuestion(q, level, questions.length, topic, params));
+    }
   }
 
   return questions;
+}
+
+function wrapQuestion(q, level, index, topic, params) {
+  return {
+    id: `vr-${level}-${index}`,
+    subject: 'verbal',
+    topic,
+    level,
+    prompt: q.prompt,
+    options: q.options,
+    correctIndex: q.correctIndex,
+    timeAllowedSeconds: params.timeAllowedSeconds || 60,
+    explanation: q.explanation
+  };
 }

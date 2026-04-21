@@ -58,7 +58,7 @@ export async function show(...params) {
 
   if (questions.length === 0) {
     const generate = GENERATORS[subject];
-    questions = generate ? generate(level, QUESTIONS_PER_LEVEL) : [];
+    questions = generate ? generate(level, QUESTIONS_PER_LEVEL, branchId) : [];
   }
 
   if (questions.length === 0) {
