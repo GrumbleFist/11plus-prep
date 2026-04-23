@@ -16,6 +16,15 @@ function makeSeed(level, index) {
   return level * 997 + index * 131 + 7919;
 }
 
+// Branch-aware seed: same (branch, level) always produces the same order,
+// but different branches at the same level get different permutations.
+function branchSeed(branchId, level) {
+  const s = `${branchId || '_'}:${level}`;
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+  return (h >>> 0) || 1;
+}
+
 // Pick from array using RNG
 function pick(rng, arr) { return arr[Math.floor(rng() * arr.length)]; }
 function randInt(rng, min, max) { return Math.floor(rng() * (max - min + 1)) + min; }
@@ -810,10 +819,273 @@ function coordinatesMidpoint(level, index, rng) {
   };
 }
 
+// --- NUMBER BRANCH (Place Value, Factors, Primes, HCF/LCM, Roman Numerals) ---
+
+function placeValue(level, index, rng) {
+  const digits = Math.min(4 + Math.floor(level / 3), 7);
+  let n = 0;
+  for (let i = 0; i < digits; i++) n = n * 10 + randInt(rng, i === 0 ? 1 : 0, 9);
+  const str = String(n);
+  const pickPos = randInt(rng, 0, str.length - 1);
+  const digit = Number(str[pickPos]);
+  const placeValue = digit * Math.pow(10, str.length - 1 - pickPos);
+  const placeNames = ['ones', 'tens', 'hundreds', 'thousands', 'ten thousands', 'hundred thousands', 'millions'];
+  const placeName = placeNames[str.length - 1 - pickPos];
+  const { options, correctIndex } = makeOptions(rng, placeValue);
+  return {
+    prompt: `What is the value of the digit ${digit} in ${n.toLocaleString()}?`,
+    options, correctIndex,
+    explanation: { steps: [`The ${digit} is in the ${placeName} place.`, `Its value is ${placeValue.toLocaleString()}.`], tip: 'Look at which column the digit sits in: ones, tens, hundreds, thousands...' }
+  };
+}
+
+function rounding(level, index, rng) {
+  const nearests = [10, 100, 1000];
+  if (level >= 5) nearests.push(10000);
+  const nearest = pick(rng, nearests);
+  const n = randInt(rng, nearest * 2, nearest * 50 + 500);
+  const answer = Math.round(n / nearest) * nearest;
+  const { options, correctIndex } = makeOptions(rng, answer);
+  return {
+    prompt: `Round ${n.toLocaleString()} to the nearest ${nearest.toLocaleString()}.`,
+    options: options.map(v => Number(v).toLocaleString()), correctIndex,
+    explanation: { steps: [`Look at the digit after the ${nearest.toLocaleString()}s place.`, `If it's 5 or more, round up; if less than 5, round down.`, `${n.toLocaleString()} rounds to ${answer.toLocaleString()}.`], tip: `Rule: 5 or more, round up; 4 or less, round down.` }
+  };
+}
+
+function negativeNumbers(level, index, rng) {
+  const type = randInt(rng, 0, 2);
+  let prompt, answer;
+  if (type === 0) {
+    const a = randInt(rng, -12, -1);
+    const b = randInt(rng, 1, 15);
+    answer = a + b;
+    prompt = `What is ${a} + ${b}?`;
+  } else if (type === 1) {
+    const a = randInt(rng, 2, 10);
+    const b = randInt(rng, a + 1, a + 15);
+    answer = a - b;
+    prompt = `What is ${a} − ${b}?`;
+  } else {
+    const a = randInt(rng, -10, -1);
+    const b = randInt(rng, -8, -1);
+    answer = a - b;
+    prompt = `What is ${a} − (${b})?`;
+  }
+  const { options, correctIndex } = makeOptions(rng, answer);
+  return {
+    prompt, options, correctIndex,
+    explanation: { steps: [`Answer: ${answer}`], tip: 'Think of a number line: adding moves right, subtracting moves left. Two minuses make a plus.' }
+  };
+}
+
+function factorsQuestion(level, index, rng) {
+  const target = pick(rng, [12, 18, 20, 24, 30, 36, 40, 48, 60]);
+  const factors = [];
+  for (let i = 1; i <= target; i++) if (target % i === 0) factors.push(i);
+  const correct = pick(rng, factors);
+  const nonFactors = [];
+  for (let i = 2; i <= target && nonFactors.length < 20; i++) if (target % i !== 0) nonFactors.push(i);
+  const wrongs = [];
+  const shuffled = [...nonFactors];
+  for (let i = shuffled.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]; }
+  for (const w of shuffled) { if (wrongs.length < 4) wrongs.push(w); }
+  const options = [correct, ...wrongs];
+  for (let i = options.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [options[i], options[j]] = [options[j], options[i]]; }
+  return {
+    prompt: `Which of these is a factor of ${target}?`,
+    options: options.map(String), correctIndex: options.indexOf(correct),
+    explanation: { steps: [`A factor divides exactly into ${target} with no remainder.`, `${target} ÷ ${correct} = ${target / correct} (a whole number).`], tip: 'Test each option: if it divides into the number with no remainder, it\'s a factor.' }
+  };
+}
+
+function primeQuestion(level, index, rng) {
+  const primes = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97];
+  const nonPrimes = [4, 6, 8, 9, 10, 12, 14, 15, 16, 18, 20, 21, 22, 24, 25, 26, 27, 28, 33, 35, 39, 49, 51, 55, 65, 77, 91];
+  const correct = pick(rng, primes);
+  const shuffled = [...nonPrimes];
+  for (let i = shuffled.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]; }
+  const wrongs = shuffled.slice(0, 4);
+  const options = [correct, ...wrongs];
+  for (let i = options.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [options[i], options[j]] = [options[j], options[i]]; }
+  return {
+    prompt: `Which of these is a prime number?`,
+    options: options.map(String), correctIndex: options.indexOf(correct),
+    explanation: { steps: [`A prime number has exactly two factors: 1 and itself.`, `${correct} is prime.`], tip: '1 is NOT prime. 2 is the only even prime. Check if a number has any factors other than 1 and itself.' }
+  };
+}
+
+function squareCubeQuestion(level, index, rng) {
+  const isSquare = rng() > 0.5;
+  if (isSquare) {
+    const n = randInt(rng, 2, 12);
+    const answer = n * n;
+    const { options, correctIndex } = makeOptions(rng, answer);
+    return {
+      prompt: `What is ${n} squared (${n}²)?`,
+      options, correctIndex,
+      explanation: { steps: [`${n}² means ${n} × ${n}`, `${n} × ${n} = ${answer}`], tip: 'Squared means multiply the number by itself.' }
+    };
+  }
+  const n = randInt(rng, 2, 6);
+  const answer = n * n * n;
+  const { options, correctIndex } = makeOptions(rng, answer);
+  return {
+    prompt: `What is ${n} cubed (${n}³)?`,
+    options, correctIndex,
+    explanation: { steps: [`${n}³ means ${n} × ${n} × ${n}`, `${n} × ${n} × ${n} = ${answer}`], tip: 'Cubed means multiply the number by itself three times.' }
+  };
+}
+
+function squareRootQuestion(level, index, rng) {
+  const n = randInt(rng, 2, 15);
+  const sq = n * n;
+  const { options, correctIndex } = makeOptions(rng, n);
+  return {
+    prompt: `What is the square root of ${sq} (√${sq})?`,
+    options, correctIndex,
+    explanation: { steps: [`√${sq} asks: what number times itself gives ${sq}?`, `${n} × ${n} = ${sq}, so √${sq} = ${n}`], tip: 'Think of the square numbers: 1, 4, 9, 16, 25, 36, 49, 64, 81, 100...' }
+  };
+}
+
+function hcfLcmQuestion(level, index, rng) {
+  const a = randInt(rng, 3, 8) * 2;
+  const b = randInt(rng, 3, 8) * 3;
+  const isHCF = rng() > 0.5;
+  let answer;
+  if (isHCF) {
+    answer = gcd(a, b);
+  } else {
+    answer = (a * b) / gcd(a, b);
+  }
+  const { options, correctIndex } = makeOptions(rng, answer);
+  return {
+    prompt: `What is the ${isHCF ? 'HCF (Highest Common Factor)' : 'LCM (Lowest Common Multiple)'} of ${a} and ${b}?`,
+    options, correctIndex,
+    explanation: isHCF
+      ? { steps: [`List factors of ${a} and ${b}.`, `The largest factor they share is ${answer}.`], tip: 'HCF = biggest number that divides into both.' }
+      : { steps: [`List multiples of ${a} and ${b}.`, `The smallest multiple they share is ${answer}.`], tip: 'LCM = smallest number both divide into.' }
+  };
+}
+
+function romanNumeralQuestion(level, index, rng) {
+  const numerals = [
+    [1, 'I'], [4, 'IV'], [5, 'V'], [9, 'IX'], [10, 'X'], [14, 'XIV'], [19, 'XIX'], [20, 'XX'],
+    [24, 'XXIV'], [29, 'XXIX'], [40, 'XL'], [49, 'XLIX'], [50, 'L'], [69, 'LXIX'], [90, 'XC'],
+    [99, 'XCIX'], [100, 'C'], [150, 'CL'], [400, 'CD'], [500, 'D'], [900, 'CM'], [1000, 'M'],
+    [1984, 'MCMLXXXIV'], [2024, 'MMXXIV']
+  ];
+  const pickIdx = randInt(rng, 0, numerals.length - 1);
+  const [num, rom] = numerals[pickIdx];
+  const isToArabic = rng() > 0.5;
+  if (isToArabic) {
+    const wrongs = new Set();
+    while (wrongs.size < 4) {
+      const w = num + randInt(rng, -20, 20);
+      if (w !== num && w > 0) wrongs.add(w);
+    }
+    const options = [num, ...wrongs].slice(0, 5).sort((a, b) => a - b);
+    return {
+      prompt: `What number is ${rom} in Roman numerals?`,
+      options: options.map(String), correctIndex: options.indexOf(num),
+      explanation: { steps: [`${rom} = ${num}`], tip: 'I=1, V=5, X=10, L=50, C=100, D=500, M=1000. A smaller numeral before a larger one is subtracted.' }
+    };
+  }
+  const wrongIdxs = new Set();
+  while (wrongIdxs.size < 4) {
+    const w = randInt(rng, 0, numerals.length - 1);
+    if (w !== pickIdx) wrongIdxs.add(w);
+  }
+  const options = [rom, ...[...wrongIdxs].map(i => numerals[i][1])];
+  for (let i = options.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [options[i], options[j]] = [options[j], options[i]]; }
+  return {
+    prompt: `What is ${num} in Roman numerals?`,
+    options, correctIndex: options.indexOf(rom),
+    explanation: { steps: [`${num} = ${rom}`], tip: 'I=1, V=5, X=10, L=50, C=100, D=500, M=1000. Write the largest first.' }
+  };
+}
+
+// --- STATISTICS ADDITIONS (for statistics branch) ---
+
+function medianQuestion(level, index, rng) {
+  const count = pick(rng, [5, 7]);
+  const nums = [];
+  while (nums.length < count) {
+    const v = randInt(rng, 1, 20 + level);
+    if (!nums.includes(v)) nums.push(v);
+  }
+  const sorted = [...nums].sort((a, b) => a - b);
+  const answer = sorted[Math.floor(count / 2)];
+  const { options, correctIndex } = makeOptions(rng, answer);
+  return {
+    prompt: `Find the median of these numbers:\n\n${nums.join(', ')}`,
+    options, correctIndex,
+    explanation: { steps: [`Sort: ${sorted.join(', ')}`, `The middle value is ${answer}.`], tip: 'Median = the middle value when the numbers are in order.' }
+  };
+}
+
+function modeRangeQuestion(level, index, rng) {
+  const base = randInt(rng, 2, 15);
+  const modeVal = base + randInt(rng, 0, 5);
+  const nums = [modeVal, modeVal, modeVal];
+  while (nums.length < 6) {
+    const v = randInt(rng, 1, 25);
+    if (v !== modeVal) nums.push(v);
+  }
+  for (let i = nums.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [nums[i], nums[j]] = [nums[j], nums[i]]; }
+  const isMode = rng() > 0.5;
+  if (isMode) {
+    const { options, correctIndex } = makeOptions(rng, modeVal);
+    return {
+      prompt: `Find the mode of these numbers:\n\n${nums.join(', ')}`,
+      options, correctIndex,
+      explanation: { steps: [`${modeVal} appears most often (3 times).`], tip: 'Mode = the value that appears most often.' }
+    };
+  }
+  const answer = Math.max(...nums) - Math.min(...nums);
+  const { options, correctIndex } = makeOptions(rng, answer);
+  return {
+    prompt: `Find the range of these numbers:\n\n${nums.join(', ')}`,
+    options, correctIndex,
+    explanation: { steps: [`Largest: ${Math.max(...nums)}, smallest: ${Math.min(...nums)}.`, `Range = ${Math.max(...nums)} − ${Math.min(...nums)} = ${answer}.`], tip: 'Range = largest minus smallest.' }
+  };
+}
+
+// --- PROBLEM-SOLVING ADDITIONS ---
+
+function workingBackwards(level, index, rng) {
+  const answer = randInt(rng, 3, 15);
+  const addVal = randInt(rng, 3, 12);
+  const mulVal = randInt(rng, 2, 5);
+  const final = (answer + addVal) * mulVal;
+  const { options, correctIndex } = makeOptions(rng, answer);
+  return {
+    prompt: `I think of a number. I add ${addVal}, then multiply by ${mulVal}. The answer is ${final}. What was my number?`,
+    options, correctIndex,
+    explanation: { steps: [`Work backwards: ${final} ÷ ${mulVal} = ${final / mulVal}`, `${final / mulVal} − ${addVal} = ${answer}`], tip: 'To undo a sequence of operations, do the opposite in reverse order.' }
+  };
+}
+
+function systematicListing(level, index, rng) {
+  const digitCount = 3;
+  const digits = [];
+  while (digits.length < digitCount) {
+    const d = randInt(rng, 1, 9);
+    if (!digits.includes(d)) digits.push(d);
+  }
+  const answer = 6; // 3! = 6 permutations
+  const { options, correctIndex } = makeOptions(rng, answer);
+  return {
+    prompt: `How many different 3-digit numbers can you make using each of the digits ${digits.join(', ')} exactly once?`,
+    options, correctIndex,
+    explanation: { steps: [`3 choices × 2 choices × 1 choice = 6 arrangements.`, `Answer: 6`], tip: 'For n different items in a row, there are n × (n−1) × (n−2)... arrangements.' }
+  };
+}
+
 // ===================== MASTER GENERATOR =====================
 
-// Map topic to available generators
-const GENERATORS = {
+// Legacy topic → generator rotation (only used when no branchId supplied)
+const LEGACY_GENERATORS = {
   'arithmetic': [additionSimple, subtractionSimple, multiplyBasic, divideBasic, missingNumber, wordProblemBasic],
   'fractions-basics': [fractionOfAmount, equivalentFractions, compareFractions],
   'geometry-basics': [rectangleArea, rectanglePerimeter, anglesTriangle],
@@ -835,17 +1107,45 @@ const GENERATORS = {
   'challenge-problems': [multiStepProblem, reversePercentage, bodmas, solveEquationTwoStep, speedDistanceTime]
 };
 
-export function generateMathsQuestions(level, count = 5) {
-  const topic = getTopicForLevel('maths', level);
+// Route each tree branch ID to a rotation of generators so the question
+// TYPE matches the branch TITLE the child saw. The rotation ensures a
+// 5-question level cycles through the branch's available question types
+// instead of showing 5 identical variants.
+const BRANCH_GENERATORS = {
+  'number': [placeValue, rounding, negativeNumbers, factorsQuestion, primeQuestion, squareCubeQuestion, squareRootQuestion, hcfLcmQuestion, romanNumeralQuestion],
+  'calculation': [additionSimple, subtractionSimple, multiplyBasic, divideBasic, missingNumber, bodmas, wordProblemBasic],
+  'fractions': [fractionOfAmount, equivalentFractions, compareFractions, addFractionsSameDenom],
+  'decimals': [decimalAddition, decimalOrdering],
+  'percentages-ratio': [percentageOfAmount, percentageIncrease, reversePercentage, ratioShare, ratioSimplify],
+  'algebra': [solveEquationSimple, solveEquationTwoStep, algebraWordProblem, arithmeticSequence, geometricSequence, nthTerm, missingNumber],
+  'geometry': [anglesTriangle, anglesStraightLine, anglesAroundPoint, coordinatesMidpoint],
+  'measurement': [rectangleArea, rectanglePerimeter, triangleArea, volumeCuboid, timeDuration, speedDistanceTime],
+  'statistics': [meanAverage, medianQuestion, modeRangeQuestion, probability],
+  'problem-solving': [multiStepProblem, workingBackwards, systematicListing, bodmas]
+};
+
+export function generateMathsQuestions(level, count = 5, branchId = null) {
   const params = getDifficultyParams(level, 'maths');
-  const gens = GENERATORS[topic] || GENERATORS['arithmetic'];
+  const topic = branchId || getTopicForLevel('maths', level);
+
+  let gens = BRANCH_GENERATORS[branchId];
+  if (!gens) gens = LEGACY_GENERATORS[topic] || LEGACY_GENERATORS['arithmetic'];
+
+  const seed = branchSeed(branchId, level);
   const questions = [];
+  const seenPrompts = new Set();
 
   for (let i = 0; i < count; i++) {
-    const rng = seededRNG(makeSeed(level, i));
-    // Rotate through available generators to ensure variety
+    // Rotate through the branch's generators so a 5-question level cycles
+    // through several question types instead of repeating one.
     const gen = gens[i % gens.length];
-    const q = gen(level, i, rng);
+    let q, tries = 0;
+    do {
+      const rng = seededRNG((seed ^ (i * 2654435761) ^ (tries * 40503)) >>> 0);
+      q = gen(level, i * 17 + tries, rng);
+      tries++;
+    } while (seenPrompts.has(q.prompt) && tries < 12);
+    seenPrompts.add(q.prompt);
     questions.push({
       id: `maths-${level}-${i}`,
       subject: 'maths',

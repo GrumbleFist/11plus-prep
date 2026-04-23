@@ -14,6 +14,15 @@ function pick(rng, arr) { return arr[Math.floor(rng() * arr.length)]; }
 function randInt(rng, min, max) { return Math.floor(rng() * (max - min + 1)) + min; }
 function shuffle(rng, arr) { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 
+// Branch-aware seed — same (branch, level) always produces the same order,
+// different branches at the same level get different permutations.
+function branchSeed(branchId, level) {
+  const s = `${branchId || '_'}:${level}`;
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+  return (h >>> 0) || 1;
+}
+
 // ===================== SVG PRIMITIVES =====================
 
 const COLOUR_NAMES = {
@@ -955,6 +964,7 @@ function paperFoldingQuestion(level, index, rng) {
 
 // ===================== MASTER GENERATOR =====================
 
+// Legacy topic-keyed map — used as fallback when branchId is null.
 const GENERATORS = {
   'odd-one-out': [oddOneOutCompound, oddOneOutFill, oddOneOutMultiProp],
   'series-simple': [seriesShapeAndColour, seriesGrowing, seriesRotating],
@@ -968,20 +978,44 @@ const GENERATORS = {
   'paper-folding': [paperFoldingQuestion],
 };
 
-export function generateNvrQuestions(level, count = 5) {
+// Branch-keyed map — mirrors the skill-tree branch IDs exactly.
+// 'nets-3d' falls back to paperFoldingQuestion until a dedicated generator is built.
+const BRANCH_GENERATORS = {
+  'odd-one-out':   [oddOneOutCompound, oddOneOutFill, oddOneOutMultiProp],
+  'series':        [seriesShapeAndColour, seriesRotating, seriesGrowing],
+  'analogies':     [shapeAnalogy],
+  'matrices':      [matrixQuestion],
+  'reflections':   [reflectionQuestion],
+  'rotations':     [rotationQuestion],
+  'paper-folding': [paperFoldingQuestion],
+  'nets-3d':       [paperFoldingQuestion],
+};
+
+export function generateNvrQuestions(level, count = 5, branchId = null) {
   const topic = getTopicForLevel('nonverbal', level);
   const params = getDifficultyParams(level, 'nonverbal');
-  const gens = GENERATORS[topic] || GENERATORS['odd-one-out'];
+
+  let gens = BRANCH_GENERATORS[branchId];
+  if (!gens) gens = GENERATORS[topic] || GENERATORS['odd-one-out'];
+
+  const seed = branchSeed(branchId, level);
   const questions = [];
+  const seenPrompts = new Set();
 
   for (let i = 0; i < count; i++) {
-    const rng = seededRNG(makeSeed(level, i));
     const gen = gens[i % gens.length];
-    const q = gen(level, i, rng);
+    let q, tries = 0;
+    do {
+      const rng = seededRNG((seed ^ (i * 2654435761) ^ (tries * 40503)) >>> 0);
+      q = gen(level, i * 17 + tries, rng);
+      tries++;
+    } while (seenPrompts.has(q.prompt) && tries < 12);
+    seenPrompts.add(q.prompt);
+
     questions.push({
       id: `nvr-${level}-${i}`,
       subject: 'nonverbal',
-      topic,
+      topic: branchId || topic,
       level,
       prompt: q.prompt,
       svgPrompt: q.svgPrompt,

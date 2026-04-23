@@ -1,7 +1,7 @@
 # PROJECT_STATUS
 
 ## Last Updated
-2026-04-21 — Achievement/badge system live (65 badges: 10 tier + 46 branch + 4 subject + 5 misc). Blocking "Awesome!" modal with pending queue persists across reloads. Gallery on dashboard + results, grouped by category (earned vs locked). Dashboard now shows learner banner (XP / level / daily streak) above overview cards. SW bumped to v27, `js/badges.js` added to precache. Next up per user directive: fix maths + nonverbal generators for branch-ID routing (same pattern as verbal).
+2026-04-23 — Maths generator successfully migrated to branch-ID routing (BRANCH_GENERATORS map + branchSeed + dedup-retry loop, same pattern as verbal.js). Nonverbal generator migration is **next and in progress** — still on legacy flat `generateNvrQuestions(level, count)` with no branchId param. Achievement system from 2026-04-21 remains live but not yet browser-verified by user.
 
 ## Project Purpose
 PWA for 11+ GL Assessment exam preparation. Initially built for user's son (exam Sep 2027, superselective target). Path A locked: polish PWA to SaaS-grade first, commercialise later. GL Assessment only, four subjects only.
@@ -14,17 +14,14 @@ PWA for 11+ GL Assessment exam preparation. Initially built for user's son (exam
 
 ## Current Phase
 **Phase 9 — Content rebuild + skill trees + quality pipeline + kid-friendly UI + multi-profile + achievements.**
-Four English banks authored (spelling, vocabulary L1-30, cloze, synonyms-antonyms). Gamification + profile picker + achievement system live. Verbal generator rewired branch-first. Maths + NVR still on legacy flat generators — next fix.
+Verbal + maths generators branch-routed. NVR is the last generator to migrate. Four English banks authored.
 
-## Recent Commits (in order)
+## Recent Commits
 | Commit | Scope |
 |---|---|
-| 42fbf5d | Gamification layer: XP, streaks, badges, confetti, SW v22→v23 |
-| c9025f2 | Profile picker: Dorothy / Arnold, per-profile storage, subject-icon PNGs, SW v24 |
-| c249ca5 | Profile picker blank-screen fix (view-profile → view-profiles), SW v25 |
-| ebdcdf8 | Verbal + NVR question quality across all banks |
+| ebdcdf8 | Fix verbal + NVR question quality across all banks |
 | d47f917 | Initial commit: 11+ prep PWA |
-| **next** | Achievement system: 65 badges, blocking modal, pending queue, dashboard + results gallery, SW v27 |
+| *uncommitted* | Maths branch routing (BRANCH_GENERATORS); achievement system (65 badges, SW v27); nonverbal still legacy |
 
 ## Architecture Now Live
 - **Profile layer** `js/profiles.js` + `js/views/profile.js`
@@ -32,59 +29,52 @@ Four English banks authored (spelling, vocabulary L1-30, cloze, synonyms-antonym
 - **Trees** `js/data/trees/{english,maths,verbal,nonverbal}.json`
 - **Banks** `js/data/banks/<subject>/<branch>.json`
 - **Gamification** `js/gamification.js` — XP curve `50*n*(n+1)`, 10 tier titles, streak/perfect/gate badges, confetti, `awardExternalBadge` hook
-- **Badges** `js/badges.js` — 65-badge catalogue, branch/subject completion detection, blocking modal with pending queue, gallery renderer (compact or full)
+- **Badges** `js/badges.js` — 65-badge catalogue, blocking modal with pending queue, gallery renderer
 - **Verbal generator** — branch-ID routed across 21 GL types; shuffled-pool slicing for pool-based, dedup-by-prompt retry for algorithmic
+- **Maths generator** — branch-ID routed across 10 branches with generator rotation per branch; dedup-by-prompt retry
+- **Nonverbal generator** — ⚠️ STILL LEGACY — next fix
 - **SW cache v27** — all JS + trees + banks + badges.js precached
+- **play.js** — already passes `branchId` to all generators (line 61), so NVR fix is isolated to nonverbal.js
 
-## Achievement System (new this session)
-- **10 tier badges** awarded on learner-level up (Rookie → Mastermind)
-- **46 branch-complete badges** awarded when every level in a branch is passed
-- **4 subject-complete badges** awarded when every branch in a subject is done
-- **5 misc badges** retained (streak3/5/10, perfectScore, gateMaster)
-- Awards silently enqueue to `state.pendingBadges` in localStorage during gameplay
-- Modal surfaces at end-of-level results screen; kid must click "Awesome!" per badge
-- Queue persists across reloads so nothing is lost if the tab closes
-- Gallery on dashboard + results: collapsible per-category sections, earned-first sort, locked badges grayed out
+## Bank / Generator Coverage
+| Subject | Branches | Generator status | Banks |
+|---|---|---|---|
+| english | 7 branches | legacy (banks preferred) | 4 of 7 banks authored (spelling, vocab, cloze, syn-ant) |
+| verbal | 21 GL types | ✅ branch-routed | none yet |
+| maths | 10 branches | ✅ branch-routed (2026-04-23) | none yet |
+| nonverbal | 8 branches | ⚠️ legacy flat `GENERATORS[topic]` — needs fix | none yet |
 
-## Bank Coverage
-| Subject | Branch | Levels filled | Items | Status |
-|---|---|---|---|---|
-| english | spelling | 1-20 (all) | 200 | ✅ full |
-| english | vocabulary | 1-30 (all) | 300 | ✅ full |
-| english | cloze | 1-15 (all) | 150 | ✅ full |
-| english | synonyms-antonyms | 1-12 (all) | 120 | ✅ full (L12 gate) |
-| english | reading-comprehension | 0 of 25 | 0 | ⬜ not started |
-| english | grammar | 0 of 18 | 0 | ⬜ |
-| english | punctuation | 0 of 12 | 0 | ⬜ |
-| verbal | (21 GL types) | generator-routed per branch | 0 | ⚠️ fallback generators for 5 branches |
-| maths | (10 branches) | legacy flat generator | — | ⚠️ needs branchId routing NEXT |
-| nonverbal | (8 branches) | legacy flat generator | — | ⚠️ needs branchId routing NEXT |
+## Nonverbal migration plan (NEXT)
+- Branch IDs (8): `odd-one-out`, `series`, `analogies`, `matrices`, `reflections`, `rotations`, `paper-folding`, `nets-3d`
+- Available generator functions in file: `oddOneOutCompound`, `oddOneOutFill`, `oddOneOutMultiProp`, `seriesShapeAndColour`, `seriesGrowing`, `seriesRotating`, `reflectionQuestion`, `rotationQuestion`, `shapeAnalogy`, `classificationQuestion`, `matrixQuestion`, `codingQuestion`, `paperFoldingQuestion`
+- Gap: no `nets-3d` generator — fallback to `paperFoldingQuestion` (closest spatial analogue) until a dedicated one is built
+- Apply maths.js pattern exactly: `BRANCH_GENERATORS` object mapping branchId → array of generator fns, `branchSeed(branchId, level)` for deterministic seeding, `i % gens.length` rotation, `seenPrompts` Set with retry-up-to-12.
 
 ## Honest Caveats
-- Achievement system NOT YET browser-tested. User should hard-refresh to pick up SW v27 and verify: (a) finishing a level surfaces the pending-badge modal, (b) "Awesome!" button dismisses one at a time, (c) gallery on dashboard groups earned vs locked, (d) completing every level in a branch triggers the branch badge + subject badge if last branch.
-- Maths + NVR generators still repeat questions across branches and ignore branch headings — fix applies the verbal.js pattern next.
+- Achievement system (65 badges, SW v27) still NOT browser-verified by user.
+- Nonverbal generator still repeats questions and ignores branch headings — the fix mirrors verbal.js / maths.js.
+- After NVR fix: bump SW to v28, commit everything (maths routing + badges + NVR routing are all uncommitted).
 
-## Next Steps (in priority order)
-1. **Maths generator: branch-ID routing** — 10 branches (number, calculation, fractions, decimals, percentages-ratio, algebra, geometry, measurement, statistics, problem-solving). Apply verbal.js pattern: `branchSeed`, `BRANCH_GENERATORS` map, dedup-retry loop.
-2. **Nonverbal generator: branch-ID routing** — 8 branches (odd-one-out, series, analogies, matrices, reflections, rotations, paper-folding, nets-3d). Same pattern.
-3. User confirms achievement system end-to-end in browser.
+## Next Steps (priority order)
+1. **Nonverbal generator: branch-ID routing** — apply maths.js pattern to the 8 NVR branches.
+2. User confirms achievement system + generator fixes end-to-end in browser.
+3. Bump SW to v28, commit all pending work.
 4. Dedicated verbal generators or banks for the 5 "close-enough" verbal branches.
-5. Author English reading-comprehension bank (25 levels).
-6. Author English grammar + punctuation banks.
-7. Start verbal banks (21 GL types).
+5. Author English reading-comprehension bank (25 levels), then grammar + punctuation banks.
+6. Start verbal banks (21 GL types).
+7. Build dedicated nets-3d generator.
 
 ## Key Decisions Locked
 - Path A (polish-first) — don't reopen.
 - Scope: GL Assessment only, four subjects only.
 - Skill trees per question type, not flat 100 levels.
-- Quality pipeline (validators) runs BEFORE every bank commit.
+- Validators run BEFORE every bank commit (`node scripts/validate-bank.mjs <path>`).
 - Commit as you go — don't batch.
 - Gamification intrinsic, not extrinsic.
-- Multi-profile Dorothy/Arnold is temporary; proper account management ships when commercialising.
+- Multi-profile Dorothy/Arnold is temporary; proper accounts ship at commercialisation.
 
-## Reminders for Next Session / User
-- Validator is live. Any new bank must pass `node scripts/validate-bank.mjs <path>` before commit.
+## Reminders
+- Validator is live — any new bank must pass it before commit.
 - User is non-technical — explain decisions in plain English.
-- Path A is locked.
-- SW cache is v27 — bump it any time a JS/CSS/JSON asset changes.
+- SW cache is v27 — bump on any JS/CSS/JSON change.
 - User handles image optimisation themselves.

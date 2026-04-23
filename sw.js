@@ -1,4 +1,4 @@
-const CACHE_NAME = '11plus-v27';
+const CACHE_NAME = '11plus-v28';
 const IMAGE_CACHE = '11plus-images-v1';
 
 const ASSETS = [
